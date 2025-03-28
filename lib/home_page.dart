@@ -11,20 +11,19 @@ class HomePage extends StatefulWidget {
 
 class HomePageState extends State<HomePage> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  List<String> blocos = [];
+  List<String> salas = [];
 
   @override
   void initState() {
     super.initState();
-    _buscarBlocos();
+    _buscarSalas();
   }
 
-  // Função para buscar os blocos no Firestore
-  void _buscarBlocos() async {
+  void _buscarSalas() async {
     try {
       QuerySnapshot snapshot = await _firestore.collection('salas').get();
       setState(() {
-        blocos = snapshot.docs.map((doc) => doc['nome'].toString()).toList();
+        salas = snapshot.docs.map((doc) => doc['nome'].toString()).toList();
       });
     } catch (e) {
       print("Erro ao buscar blocos: $e");
@@ -33,7 +32,7 @@ class HomePageState extends State<HomePage> {
 
   // Quando um bloco é clicado
   void blocoClicado(int index) {
-    print("Bloco ${blocos[index]} clicado!");
+    print("Bloco ${salas[index]} clicado!");
   }
 
   @override
@@ -45,8 +44,8 @@ class HomePageState extends State<HomePage> {
         child: Padding(
           padding: const EdgeInsets.all(10.0),
           child:
-              blocos.isEmpty
-                  ? CircularProgressIndicator() // Mostra carregamento enquanto busca os blocos
+              salas.isEmpty
+                  ? CircularProgressIndicator()
                   : GridView.builder(
                     gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: 2,
@@ -54,7 +53,7 @@ class HomePageState extends State<HomePage> {
                       mainAxisSpacing: 10,
                       childAspectRatio: 1.5,
                     ),
-                    itemCount: blocos.length,
+                    itemCount: salas.length,
                     itemBuilder: (context, index) {
                       return GestureDetector(
                         onTap: () => blocoClicado(index),
@@ -65,7 +64,7 @@ class HomePageState extends State<HomePage> {
                           ),
                           alignment: Alignment.center,
                           child: Text(
-                            "{blocos[index]}",
+                            salas[index],
                             style: TextStyle(color: Colors.white, fontSize: 20),
                           ),
                         ),
@@ -85,7 +84,6 @@ class HomePageState extends State<HomePage> {
         ],
         onTap: (value) {
           if (value == 1) {
-            // Futuramente, pode ser usado para adicionar novos blocos no Firestore
             print("Botão de adicionar pressionado!");
           }
         },
