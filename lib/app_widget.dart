@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:stock_manager/admin_page.dart';
+import 'package:stock_manager/equip_page.dart';
 import 'package:stock_manager/home_page.dart';
 import 'package:stock_manager/login_page.dart';
 
@@ -17,6 +18,7 @@ class AppWidget extends StatelessWidget {
         '/': (context) => LoginPage(),
         '/home': (context) => HomePage(),
         '/admin': (context) => AdminPage(),
+        '/equip': (context) => EquipPage(),
       },
     );
   }

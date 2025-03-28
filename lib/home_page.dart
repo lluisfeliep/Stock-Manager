@@ -11,7 +11,7 @@ class HomePage extends StatefulWidget {
 
 class HomePageState extends State<HomePage> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  List<String> salas = [];
+  List<Map<String, String>> salas = [];
 
   @override
   void initState() {
@@ -23,16 +23,33 @@ class HomePageState extends State<HomePage> {
     try {
       QuerySnapshot snapshot = await _firestore.collection('salas').get();
       setState(() {
-        salas = snapshot.docs.map((doc) => doc['nome'].toString()).toList();
+        salas =
+            snapshot.docs
+                .map((doc) => {"id": doc.id, "nome": doc["nome"].toString()})
+                .toList();
       });
     } catch (e) {
-      print("Erro ao buscar blocos: $e");
+      showDialog(
+        context: context,
+        builder:
+            (context) => AlertDialog(
+              title: Text("Erro"),
+              content: Text("$e"),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop(); // Fecha o diálogo
+                  },
+                  child: Text("OK"),
+                ),
+              ],
+            ),
+      );
     }
   }
 
-  // Quando um bloco é clicado
-  void blocoClicado(int index) {
-    print("Bloco ${salas[index]} clicado!");
+  void salaClicada(int index) {
+    Navigator.pushNamed(context, "/equip", arguments: salas[index]["id"]);
   }
 
   @override
@@ -56,7 +73,7 @@ class HomePageState extends State<HomePage> {
                     itemCount: salas.length,
                     itemBuilder: (context, index) {
                       return GestureDetector(
-                        onTap: () => blocoClicado(index),
+                        onTap: () => salaClicada(index),
                         child: Container(
                           decoration: BoxDecoration(
                             color: Colors.blue,
@@ -64,7 +81,7 @@ class HomePageState extends State<HomePage> {
                           ),
                           alignment: Alignment.center,
                           child: Text(
-                            salas[index],
+                            salas[index]["nome"].toString(),
                             style: TextStyle(color: Colors.white, fontSize: 20),
                           ),
                         ),
@@ -83,9 +100,7 @@ class HomePageState extends State<HomePage> {
           BottomNavigationBarItem(icon: Icon(Icons.person), label: "Perfil"),
         ],
         onTap: (value) {
-          if (value == 1) {
-            print("Botão de adicionar pressionado!");
-          }
+          if (value == 1) {}
         },
       ),
     );
