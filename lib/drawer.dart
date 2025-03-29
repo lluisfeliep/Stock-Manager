@@ -11,6 +11,8 @@ class CustomDrawer extends StatefulWidget {
 class _CustomDrawerState extends State<CustomDrawer> {
   @override
   Widget build(BuildContext context) {
+    final userData =
+        ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
     return Drawer(
       backgroundColor: Color(0xFFDDFFF7),
       child: Column(
@@ -38,7 +40,9 @@ class _CustomDrawerState extends State<CustomDrawer> {
               ),
             ),
             onTap: () {
-              Navigator.of(context).pushReplacementNamed('/home');
+              Navigator.of(
+                context,
+              ).pushReplacementNamed('/home', arguments: userData);
             },
           ),
           GestureDetector(
@@ -53,9 +57,29 @@ class _CustomDrawerState extends State<CustomDrawer> {
               ),
             ),
             onTap: () {
-              Navigator.of(context).pushReplacementNamed('/');
+              Navigator.of(
+                context,
+              ).pushReplacementNamed('/', arguments: userData);
             },
           ),
+          if (userData["Admin"] == true)
+            GestureDetector(
+              child: Container(
+                color: Color(0xFF9FD9E8),
+                child: ListTile(
+                  leading: Icon(Icons.person),
+                  title: Text(
+                    "Gerenciar Logins",
+                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+              onTap: () {
+                Navigator.of(
+                  context,
+                ).pushReplacementNamed('/admin', arguments: userData);
+              },
+            ),
           if (widget.extraWidgets != null) ...widget.extraWidgets!,
           Spacer(),
           GestureDetector(

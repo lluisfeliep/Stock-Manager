@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class LoginPage extends StatefulWidget {
   @override
@@ -10,6 +12,42 @@ class LoginPage extends StatefulWidget {
 class LoginPageState extends State<LoginPage> {
   String username = '';
   String password = '';
+
+  Future<void> login() async {
+    try {
+      String email = "$username@example.com"; // Transformar username em email
+
+      // Autenticar no Firebase Authentication
+      UserCredential userCredential = await FirebaseAuth.instance
+          .signInWithEmailAndPassword(email: email, password: password);
+
+      String uid = userCredential.user!.uid;
+
+      // Buscar permissões no Firestore
+      DocumentSnapshot userDoc =
+          await FirebaseFirestore.instance.collection('Users').doc(uid).get();
+
+      if (userDoc.exists) {
+        Map<String, dynamic> userData = userDoc.data() as Map<String, dynamic>;
+
+        // Redirecionar para a tela principal com os dados do usuário
+        Navigator.pushReplacementNamed(
+          context,
+          '/home', // Nome da rota para a tela principal
+          arguments:
+              userData, // Passa os dados do usuário para a tela de destino
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Usuário não encontrado no Firestore!')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Erro ao fazer login: $e')));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -69,18 +107,7 @@ class LoginPageState extends State<LoginPage> {
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
                         ElevatedButton(
-                          onPressed: () {
-                            if (username == "Admin" && password == "123") {
-                              Navigator.of(
-                                context,
-                              ).pushReplacementNamed('/admin');
-                            } else if (username == "Home" &&
-                                password == "123") {
-                              Navigator.of(
-                                context,
-                              ).pushReplacementNamed('/home');
-                            }
-                          },
+                          onPressed: login, // Chamando a função de login
                           child: const Text("Entrar"),
                         ),
                       ],

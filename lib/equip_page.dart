@@ -8,10 +8,6 @@ class EquipPage extends StatelessWidget {
     final String id = ModalRoute.of(context)!.settings.arguments as String;
     final FirebaseFirestore firestore = FirebaseFirestore.instance;
 
-    Future<void> _CriarnovaSala() async{
-      
-    }
-
     return FutureBuilder<DocumentSnapshot>(
       future: firestore.collection('salas').doc(id).get(),
       builder: (context, snapshot) {
