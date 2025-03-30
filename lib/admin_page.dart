@@ -114,6 +114,7 @@ class _AdminPageState extends State<AdminPage> {
                           content: Text('Usuário cadastrado com sucesso!'),
                         ),
                       );
+                      _buscarLogin();
                     } catch (e) {
                       ScaffoldMessenger.of(
                         context,
@@ -130,20 +131,156 @@ class _AdminPageState extends State<AdminPage> {
     );
   }
 
+  void _showEditDialog(String userId, String username) async {
+    DocumentSnapshot userDoc =
+        await _firestore.collection('Users').doc(userId).get();
+
+    TextEditingController usernameController = TextEditingController(
+      text: userDoc["username"],
+    );
+    bool isAdmin = userDoc["Admin"];
+    bool isPSala = userDoc["PSala"];
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: Text('Editar Usuário'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: usernameController,
+                    decoration: InputDecoration(labelText: 'Username'),
+                  ),
+                  Row(
+                    children: [
+                      Checkbox(
+                        value: isAdmin,
+                        onChanged: (value) {
+                          setState(() => isAdmin = value!);
+                        },
+                      ),
+                      Text('Admin'),
+                    ],
+                  ),
+                  Row(
+                    children: [
+                      Checkbox(
+                        value: isPSala,
+                        onChanged: (value) {
+                          setState(() => isPSala = value!);
+                        },
+                      ),
+                      Text('PSala'),
+                    ],
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: Text('Cancelar'),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    String newUsername = usernameController.text.trim();
+                    if (newUsername.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Preencha o username!')),
+                      );
+                      return;
+                    }
+
+                    try {
+                      await _firestore.collection('Users').doc(userId).update({
+                        "username": newUsername,
+                        "Admin": isAdmin,
+                        "PSala": isPSala,
+                      });
+
+                      Navigator.pop(context);
+                      _buscarLogin(); // Atualiza a lista na tela
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Usuário atualizado com sucesso!'),
+                        ),
+                      );
+                      _buscarLogin();
+                    } catch (e) {
+                      ScaffoldMessenger.of(
+                        context,
+                      ).showSnackBar(SnackBar(content: Text('Erro: $e')));
+                    }
+                  },
+                  child: Text('Salvar'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _deleteUser(String userId) async {
+    bool confirmDelete = await showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: Text("Excluir Usuário"),
+            content: Text("Tem certeza que deseja excluir este usuário?"),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: Text("Cancelar"),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: Text("Excluir"),
+              ),
+            ],
+          ),
+    );
+
+    if (confirmDelete) {
+      try {
+        await _firestore.collection('Users').doc(userId).delete();
+        _buscarLogin(); // Atualiza a lista na tela
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Usuário excluído com sucesso!')),
+        );
+      } catch (e) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Erro ao excluir: $e')));
+      }
+    }
+    _buscarLogin();
+  }
+
   @override
   void initState() {
     super.initState();
     _buscarLogin();
   }
 
-  void _buscarLogin() async {
+  Future<void> _buscarLogin() async {
+    await Future.delayed(Duration(seconds: 1));
     try {
       QuerySnapshot snapshot = await _firestore.collection('Users').get();
       setState(() {
         dados =
-            snapshot.docs
-                .map((doc) => {"username": doc["username"] ?? "Sem Nome"})
-                .toList();
+            snapshot.docs.map((doc) {
+              return {
+                "id": doc.id, // Agora armazenamos o ID
+                "username": doc["username"] ?? "Sem Nome",
+                "Admin": doc["Admin"] ?? false,
+                "PSala": doc["PSala"] ?? false,
+              };
+            }).toList();
       });
     } catch (e) {
       showDialog(
@@ -154,9 +291,7 @@ class _AdminPageState extends State<AdminPage> {
               content: Text("$e"),
               actions: [
                 TextButton(
-                  onPressed: () {
-                    Navigator.of(context).pop(); // Fecha o diálogo
-                  },
+                  onPressed: () => Navigator.of(context).pop(),
                   child: Text("OK"),
                 ),
               ],
@@ -173,103 +308,113 @@ class _AdminPageState extends State<AdminPage> {
       body: Container(
         color: Color(0xFFDDFFF7),
         padding: EdgeInsets.all(10),
-        child: Column(
-          children: [
-            // Cabeçalho fixo
-            Container(
-              color: Color(0xFF319FBD),
-              padding: EdgeInsets.all(8),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  Expanded(
-                    flex: 2,
-                    child: Center(
-                      child: Text(
-                        'Nome',
-                        style: TextStyle(
-                          color: Colors.black,
-                          fontWeight: FontWeight.bold,
+        child: RefreshIndicator(
+          onRefresh: _buscarLogin,
+          child: Column(
+            children: [
+              // Cabeçalho fixo
+              Container(
+                color: Color(0xFF319FBD),
+                padding: EdgeInsets.all(8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    Expanded(
+                      flex: 2,
+                      child: Center(
+                        child: Text(
+                          'Nome',
+                          style: TextStyle(
+                            color: Colors.black,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                  Expanded(
-                    flex: 1,
-                    child: Center(
-                      child: Text(
-                        'Editar',
-                        style: TextStyle(
-                          color: Colors.black,
-                          fontWeight: FontWeight.bold,
+                    Expanded(
+                      flex: 1,
+                      child: Center(
+                        child: Text(
+                          'Editar',
+                          style: TextStyle(
+                            color: Colors.black,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                  Expanded(
-                    flex: 1,
-                    child: Center(
-                      child: Text(
-                        'Apagar',
-                        style: TextStyle(
-                          color: Colors.red,
-                          fontWeight: FontWeight.bold,
+                    Expanded(
+                      flex: 1,
+                      child: Center(
+                        child: Text(
+                          'Apagar',
+                          style: TextStyle(
+                            color: Colors.red,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
 
-            // Lista rolável das linhas
-            Expanded(
-              child: ListView.builder(
-                itemCount: dados.length,
-                itemBuilder: (context, index) {
-                  return Container(
-                    color:
-                        index % 2 == 0
-                            ? Color(0xFF9FD9E8)
-                            : Color(0xFF77C8DE), // Linhas alternadas
-                    padding: EdgeInsets.all(8),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
-                      children: [
-                        Flexible(
-                          flex: 2,
-                          child: Center(
-                            child: Text(
-                              dados[index]["username"],
-                              style: TextStyle(fontSize: 16),
+              // Lista rolável das linhas
+              Expanded(
+                child: ListView.builder(
+                  itemCount: dados.length,
+                  itemBuilder: (context, index) {
+                    return Container(
+                      color:
+                          index % 2 == 0
+                              ? Color(0xFF9FD9E8)
+                              : Color(0xFF77C8DE), // Linhas alternadas
+                      padding: EdgeInsets.all(8),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceAround,
+                        children: [
+                          Flexible(
+                            flex: 2,
+                            child: Center(
+                              child: Text(
+                                dados[index]["username"],
+                                style: TextStyle(fontSize: 16),
+                              ),
                             ),
                           ),
-                        ),
-                        Expanded(
-                          flex: 1,
-                          child: Center(
-                            child: IconButton(
-                              onPressed: () {},
-                              icon: Icon(Icons.edit),
+                          Expanded(
+                            flex: 1,
+                            child: Center(
+                              child: IconButton(
+                                onPressed: () {
+                                  _showEditDialog(
+                                    dados[index]["id"],
+                                    dados[index]["username"],
+                                  );
+                                },
+                                icon: Icon(Icons.edit),
+                              ),
                             ),
                           ),
-                        ),
-                        Expanded(
-                          flex: 1,
-                          child: Center(
-                            child: IconButton(
-                              onPressed: () {},
-                              icon: Icon(Icons.delete),
+                          Expanded(
+                            flex: 1,
+                            child: Center(
+                              child: IconButton(
+                                onPressed: () {
+                                  _deleteUser(dados[index]["id"]);
+                                },
+                                icon: Icon(Icons.delete),
+                              ),
                             ),
                           ),
-                        ),
-                      ],
-                    ),
-                  );
-                },
+                        ],
+                      ),
+                    );
+                  },
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
       floatingActionButton: FloatingActionButton(

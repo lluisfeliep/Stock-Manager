@@ -5,7 +5,11 @@ import 'package:stock_manager/drawer.dart';
 class EquipPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    final String id = ModalRoute.of(context)!.settings.arguments as String;
+    final Map<String, dynamic> args =
+        ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
+
+    final String id = args["id"];
+    //final Map<String, dynamic> userData = args["userData"];
     final FirebaseFirestore firestore = FirebaseFirestore.instance;
 
     return FutureBuilder<DocumentSnapshot>(

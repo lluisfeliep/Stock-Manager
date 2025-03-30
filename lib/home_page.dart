@@ -95,7 +95,7 @@ class HomePageState extends State<HomePage> {
 
   //Função de mostrar salas na tela principal
   Future<void> _buscarSalas() async {
-    await Future.delayed(Duration(seconds: 0));
+    await Future.delayed(Duration(seconds: 1));
     try {
       QuerySnapshot snapshot = await _firestore.collection('salas').get();
       setState(() {
@@ -126,10 +126,6 @@ class HomePageState extends State<HomePage> {
     }
   }
 
-  void salaClicada(int index) {
-    Navigator.pushNamed(context, "/equip", arguments: salas[index]["id"]);
-  }
-
   @override
   Widget build(BuildContext context) {
     final userData =
@@ -155,7 +151,16 @@ class HomePageState extends State<HomePage> {
                       itemCount: salas.length,
                       itemBuilder: (context, index) {
                         return GestureDetector(
-                          onTap: () => salaClicada(index),
+                          onTap: () {
+                            Navigator.pushNamed(
+                              context,
+                              "/equip",
+                              arguments: {
+                                "id": salas[index]["id"],
+                                "userData": userData,
+                              },
+                            );
+                          },
                           child: Container(
                             decoration: BoxDecoration(
                               color: Colors.blue,
