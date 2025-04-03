@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:stock_manager/user_provider.dart';
 
 class CustomDrawer extends StatefulWidget {
   final List<Widget>? extraWidgets; // Lista opcional para novos widgets
@@ -11,8 +13,8 @@ class CustomDrawer extends StatefulWidget {
 class _CustomDrawerState extends State<CustomDrawer> {
   @override
   Widget build(BuildContext context) {
-    final userData =
-        ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
+    final userData = Provider.of<UserProvider>(context).userData;
+
     return Drawer(
       backgroundColor: Color(0xFFDDFFF7),
       child: Column(
@@ -40,9 +42,7 @@ class _CustomDrawerState extends State<CustomDrawer> {
               ),
             ),
             onTap: () {
-              Navigator.of(
-                context,
-              ).pushReplacementNamed('/home', arguments: userData);
+              Navigator.of(context).pushReplacementNamed('/home');
             },
           ),
           GestureDetector(
@@ -57,12 +57,10 @@ class _CustomDrawerState extends State<CustomDrawer> {
               ),
             ),
             onTap: () {
-              Navigator.of(
-                context,
-              ).pushReplacementNamed('/', arguments: userData);
+              Navigator.of(context).pushReplacementNamed('/');
             },
           ),
-          if (userData["Admin"] == true)
+          if (userData?["Admin"] == true)
             GestureDetector(
               child: Container(
                 color: Color(0xFF9FD9E8),
@@ -75,9 +73,7 @@ class _CustomDrawerState extends State<CustomDrawer> {
                 ),
               ),
               onTap: () {
-                Navigator.of(
-                  context,
-                ).pushReplacementNamed('/admin', arguments: userData);
+                Navigator.of(context).pushReplacementNamed('/admin');
               },
             ),
           if (widget.extraWidgets != null) ...widget.extraWidgets!,
@@ -98,6 +94,7 @@ class _CustomDrawerState extends State<CustomDrawer> {
               ),
             ),
             onTap: () {
+              Provider.of<UserProvider>(context, listen: false).logout();
               Navigator.of(context).pushReplacementNamed('/');
             },
           ),

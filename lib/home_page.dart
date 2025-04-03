@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:provider/provider.dart';
 import 'package:stock_manager/drawer.dart';
+import 'package:stock_manager/user_provider.dart';
 
 class HomePage extends StatefulWidget {
   @override
@@ -128,8 +130,8 @@ class HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    final userData =
-        ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
+    final userData = Provider.of<UserProvider>(context).userData;
+
     return Scaffold(
       appBar: AppBar(title: Text('Home'), backgroundColor: Color(0xFF63bfd8)),
       drawer: CustomDrawer(),
@@ -192,7 +194,7 @@ class HomePageState extends State<HomePage> {
         ],
         onTap: (value) {
           if (value == 1) {
-            userData["Admin"] || userData["PSala"] == true
+            userData?["Admin"] || userData?["PSala"] == true
                 ? _criarNovaSala()
                 : showDialog(
                   context: context,

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:provider/provider.dart';
+import 'package:stock_manager/user_provider.dart';
 
 class LoginPage extends StatefulWidget {
   @override
@@ -30,13 +32,10 @@ class LoginPageState extends State<LoginPage> {
       if (userDoc.exists) {
         Map<String, dynamic> userData = userDoc.data() as Map<String, dynamic>;
 
-        // Redirecionar para a tela principal com os dados do usuário
-        Navigator.pushReplacementNamed(
-          context,
-          '/home', // Nome da rota para a tela principal
-          arguments:
-              userData, // Passa os dados do usuário para a tela de destino
-        );
+        // Armazenar dados no Provider
+        Provider.of<UserProvider>(context, listen: false).setUser(userData);
+
+        Navigator.pushReplacementNamed(context, '/home');
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Usuário não encontrado no Firestore!')),
@@ -52,71 +51,78 @@ class LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.home, size: 150),
-            Padding(
-              padding: const EdgeInsets.only(top: 100, bottom: 200),
-              child: Container(
-                padding: const EdgeInsets.all(20),
-                width: 300,
-                decoration: BoxDecoration(
-                  color: Color(0xFF77C8DE),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Color(0xff4FB6D2), width: 2),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black,
-                      blurRadius: 10,
-                      spreadRadius: 2,
-                      offset: const Offset(4, 4),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextField(
-                      onChanged: (value) {
-                        username = value;
-                      },
-                      decoration: InputDecoration(
-                        labelText: 'Username',
-                        filled: true,
-                        fillColor: Colors.white,
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    TextField(
-                      onChanged: (value) {
-                        password = value;
-                      },
-                      obscureText: true,
-                      decoration: InputDecoration(
-                        labelText: 'Password',
-                        filled: true,
-                        fillColor: Colors.white, // Campo branco
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 15),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        ElevatedButton(
-                          onPressed: login, // Chamando a função de login
-                          child: const Text("Entrar"),
+      body: SingleChildScrollView(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            minHeight: MediaQuery.of(context).size.height,
+          ),
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.home, size: 150),
+                Padding(
+                  padding: const EdgeInsets.only(top: 100, bottom: 200),
+                  child: Container(
+                    padding: const EdgeInsets.all(20),
+                    width: 300,
+                    decoration: BoxDecoration(
+                      color: Color(0xFF77C8DE),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Color(0xff4FB6D2), width: 2),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black,
+                          blurRadius: 10,
+                          spreadRadius: 2,
+                          offset: const Offset(4, 4),
                         ),
                       ],
                     ),
-                  ],
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        TextField(
+                          onChanged: (value) {
+                            username = value;
+                          },
+                          decoration: InputDecoration(
+                            labelText: 'Username',
+                            filled: true,
+                            fillColor: Colors.white,
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        TextField(
+                          onChanged: (value) {
+                            password = value;
+                          },
+                          obscureText: true,
+                          decoration: InputDecoration(
+                            labelText: 'Password',
+                            filled: true,
+                            fillColor: Colors.white, // Campo branco
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
+                        const SizedBox(height: 15),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            ElevatedButton(
+                              onPressed: login, // Chamando a função de login
+                              child: const Text("Entrar"),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
