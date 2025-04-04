@@ -12,8 +12,8 @@ class UserProvider extends ChangeNotifier {
   }
 
   void logout() async {
-    await FirebaseAuth.instance.signOut(); // Deslogar do Firebase
-    _userData = null; // Limpar os dados do usuário
+    await FirebaseAuth.instance.signOut();
+    _userData = null;
     notifyListeners();
   }
 }

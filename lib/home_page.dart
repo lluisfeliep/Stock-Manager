@@ -157,10 +157,7 @@ class HomePageState extends State<HomePage> {
                             Navigator.pushNamed(
                               context,
                               "/equip",
-                              arguments: {
-                                "id": salas[index]["id"],
-                                "userData": userData,
-                              },
+                              arguments: {"id": salas[index]["id"]},
                             );
                           },
                           child: Container(

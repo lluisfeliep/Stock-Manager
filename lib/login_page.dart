@@ -31,6 +31,7 @@ class LoginPageState extends State<LoginPage> {
 
       if (userDoc.exists) {
         Map<String, dynamic> userData = userDoc.data() as Map<String, dynamic>;
+        userData['uid'] = userDoc.id;
 
         // Armazenar dados no Provider
         Provider.of<UserProvider>(context, listen: false).setUser(userData);

@@ -6,12 +6,10 @@ import 'package:stock_manager/user_provider.dart';
 
 class EquipPage extends StatefulWidget {
   @override
-  _EquipPageState createState() => _EquipPageState();
+  State<EquipPage> createState() => _EquipPageState();
 }
 
 class _EquipPageState extends State<EquipPage> {
-  late String id;
-  late Map<String, dynamic> userData;
   late FirebaseFirestore firestore;
   bool isLoading = true;
   List<Map<String, dynamic>> setoresComEquipamentos = [];
@@ -19,13 +17,162 @@ class _EquipPageState extends State<EquipPage> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final userData = Provider.of<UserProvider>(context).userData;
-    id = userData?["id"]; // Pegando o ID do usuário
     firestore = FirebaseFirestore.instance;
     _loadSetoresComEquipamentos();
   }
 
+  void _showNewEquip() {
+    final Map<String, dynamic> args =
+        ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
+    final String salaId = args["id"] as String;
+
+    TextEditingController textequipController = TextEditingController();
+    TextEditingController textlocController = TextEditingController();
+
+    String? selectedSetor;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: Text("Criar novo item"),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: textequipController,
+                    decoration: InputDecoration(
+                      labelText: 'Nome do Equipamento',
+                    ),
+                  ),
+                  TextField(
+                    controller: textlocController,
+                    decoration: InputDecoration(
+                      labelText: 'Localização do equipamento',
+                    ),
+                  ),
+                  DropdownButton<String>(
+                    hint: Text("Setor"),
+                    value: selectedSetor,
+                    isExpanded: true,
+                    items: [
+                      ...setoresComEquipamentos.map((setor) {
+                        return DropdownMenuItem<String>(
+                          value: setor['setorId'],
+                          child: Text(setor['setorNome']),
+                        );
+                      }),
+                      DropdownMenuItem<String>(
+                        value: 'add_new',
+                        child: Row(
+                          children: [
+                            Icon(Icons.add),
+                            Text("Adicionar novo setor"),
+                          ],
+                        ),
+                      ),
+                    ],
+                    onChanged: (value) async {
+                      if (value == 'add_new') {
+                        final newSetorId = await _criarNovoSetor(salaId);
+                        await _loadSetoresComEquipamentos(); // Atualiza lista
+                        setState(() {
+                          selectedSetor = newSetorId;
+                        });
+                      } else {
+                        setState(() {
+                          selectedSetor = value;
+                        });
+                      }
+                    },
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () async {
+                    if (selectedSetor != null &&
+                        textequipController.text.isNotEmpty &&
+                        textlocController.text.isNotEmpty) {
+                      await _salvarEquipamento(
+                        salaId,
+                        selectedSetor!,
+                        textequipController.text,
+                        textlocController.text,
+                      );
+                      await _loadSetoresComEquipamentos(); // atualiza lista
+                      Navigator.pop(context);
+                    }
+                  },
+                  child: Text("Salvar"),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _salvarEquipamento(
+    String salaId,
+    String setorId,
+    String nome,
+    String local,
+  ) async {
+    final userData = Provider.of<UserProvider>(context, listen: false).userData;
+    final userRef = FirebaseFirestore.instance
+        .collection('users')
+        .doc(userData?["uid"]);
+
+    await FirebaseFirestore.instance
+        .collection('salas')
+        .doc(salaId)
+        .collection('setores')
+        .doc(setorId)
+        .collection('equipamentos')
+        .add({'nome': nome, 'loc': local, 'data': DateTime.now()})
+        .then((DocumentReference docRef) async {
+          await docRef.collection("log").add({
+            'comentario': 'Criado novo equipamento',
+            'data': DateTime.now(),
+            'user': userRef,
+          });
+        });
+  }
+
+  Future<String> _criarNovoSetor(String salaId) async {
+    final setoresRef = FirebaseFirestore.instance
+        .collection('salas')
+        .doc(salaId)
+        .collection('setores');
+
+    final snapshot = await setoresRef.get();
+
+    // Pega maior número de "Setor n"
+    final numbers =
+        snapshot.docs.map((doc) {
+          final nome = doc['nome'];
+          final match = RegExp(r'Setor (\d+)').firstMatch(nome);
+          return match != null ? int.parse(match.group(1)!) : 0;
+        }).toList();
+
+    final nextNumber =
+        (numbers.isEmpty ? 0 : numbers.reduce((a, b) => a > b ? a : b)) + 1;
+    final newId = 'setor_$nextNumber';
+    final newName = 'Setor $nextNumber';
+
+    await setoresRef.doc(newId).set({'nome': newName});
+
+    return newId;
+  }
+
   Future<void> _loadSetoresComEquipamentos() async {
+    final Map<String, dynamic> args =
+        ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
+    final String id = args["id"] as String;
     try {
       QuerySnapshot setoresSnapshot =
           await firestore
@@ -59,7 +206,11 @@ class _EquipPageState extends State<EquipPage> {
                 )
                 .toList();
 
-        tempList.add({'setorNome': setorNome, 'equipamentos': equipamentos});
+        tempList.add({
+          'setorNome': setorNome,
+          'setorId': setorId,
+          'equipamentos': equipamentos,
+        });
       }
 
       if (mounted) {
@@ -132,7 +283,7 @@ class _EquipPageState extends State<EquipPage> {
               ),
       floatingActionButton: FloatingActionButton(
         backgroundColor: Color(0xFF63bfd8),
-        onPressed: () {},
+        onPressed: _showNewEquip,
         child: Icon(Icons.add),
       ),
     );
