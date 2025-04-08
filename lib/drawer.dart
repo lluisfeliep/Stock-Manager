@@ -3,9 +3,6 @@ import 'package:provider/provider.dart';
 import 'package:stock_manager/user_provider.dart';
 
 class CustomDrawer extends StatefulWidget {
-  final List<Widget>? extraWidgets; // Lista opcional para novos widgets
-
-  CustomDrawer({this.extraWidgets});
   @override
   State<CustomDrawer> createState() => _CustomDrawerState();
 }
@@ -76,7 +73,6 @@ class _CustomDrawerState extends State<CustomDrawer> {
                 Navigator.of(context).pushReplacementNamed('/admin');
               },
             ),
-          if (widget.extraWidgets != null) ...widget.extraWidgets!,
           Spacer(),
           GestureDetector(
             child: Container(

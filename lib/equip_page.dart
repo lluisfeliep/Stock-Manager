@@ -124,23 +124,29 @@ class _EquipPageState extends State<EquipPage> {
   ) async {
     final userData = Provider.of<UserProvider>(context, listen: false).userData;
     final userRef = FirebaseFirestore.instance
-        .collection('users')
+        .collection('Users')
         .doc(userData?["uid"]);
 
-    await FirebaseFirestore.instance
+    DocumentReference setorRef = FirebaseFirestore.instance
         .collection('salas')
         .doc(salaId)
         .collection('setores')
-        .doc(setorId)
+        .doc(setorId);
+
+    final equipamentoRef = await FirebaseFirestore.instance
         .collection('equipamentos')
-        .add({'nome': nome, 'loc': local, 'data': DateTime.now()})
-        .then((DocumentReference docRef) async {
-          await docRef.collection("log").add({
-            'comentario': 'Criado novo equipamento',
-            'data': DateTime.now(),
-            'user': userRef,
-          });
+        .add({
+          'nome': nome,
+          'loc': local,
+          'data': DateTime.now(),
+          'setor': setorRef,
         });
+
+    await equipamentoRef.collection("log").add({
+      'comentario': 'Criado novo equipamento',
+      'data': DateTime.now(),
+      'user': userRef,
+    });
   }
 
   Future<String> _criarNovoSetor(String salaId) async {
@@ -172,12 +178,13 @@ class _EquipPageState extends State<EquipPage> {
   Future<void> _loadSetoresComEquipamentos() async {
     final Map<String, dynamic> args =
         ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
-    final String id = args["id"] as String;
+    final String salaId = args["id"] as String;
+
     try {
-      QuerySnapshot setoresSnapshot =
+      final setoresSnapshot =
           await firestore
               .collection('salas')
-              .doc(id)
+              .doc(salaId)
               .collection('setores')
               .get();
 
@@ -187,24 +194,27 @@ class _EquipPageState extends State<EquipPage> {
         String setorNome = setorDoc['nome'];
         String setorId = setorDoc.id;
 
+        DocumentReference setorRef = firestore
+            .collection('salas')
+            .doc(salaId)
+            .collection('setores')
+            .doc(setorId);
+
+        // Buscar equipamentos com referência ao setor atual
         QuerySnapshot equipamentosSnapshot =
             await firestore
-                .collection('salas')
-                .doc(id)
-                .collection('setores')
-                .doc(setorId)
                 .collection('equipamentos')
+                .where('setor', isEqualTo: setorRef)
                 .get();
 
         List<Map<String, dynamic>> equipamentos =
-            equipamentosSnapshot.docs
-                .map(
-                  (equipDoc) => {
-                    'nome': equipDoc['nome'],
-                    'loc': equipDoc['loc'],
-                  },
-                )
-                .toList();
+            equipamentosSnapshot.docs.map((equipDoc) {
+              return {
+                'nome': equipDoc['nome'],
+                'loc': equipDoc['loc'],
+                'id': equipDoc.id,
+              };
+            }).toList();
 
         tempList.add({
           'setorNome': setorNome,
@@ -268,12 +278,20 @@ class _EquipPageState extends State<EquipPage> {
                       children:
                           setor['equipamentos']
                               .map<Widget>(
-                                (equip) => ListTile(
-                                  title: Text(equip['nome']),
-                                  subtitle: Text(
-                                    'Localização: ${equip['loc']}',
+                                (equip) => GestureDetector(
+                                  child: ListTile(
+                                    title: Text(equip['nome']),
+                                    subtitle: Text(
+                                      'Localização: ${equip['loc']}',
+                                    ),
+                                    leading: Icon(Icons.build),
                                   ),
-                                  leading: Icon(Icons.build),
+                                  onTap: () {
+                                    Navigator.of(context).pushNamed(
+                                      '/log',
+                                      arguments: {'equipId': equip['id']},
+                                    );
+                                  },
                                 ),
                               )
                               .toList(),
