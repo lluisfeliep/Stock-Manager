@@ -5,6 +5,7 @@ import 'package:stock_manager/equip_page.dart';
 import 'package:stock_manager/home_page.dart';
 import 'package:stock_manager/log_page.dart';
 import 'package:stock_manager/login_page.dart';
+import 'package:stock_manager/search_page.dart';
 import 'package:stock_manager/user_provider.dart';
 
 class AppWidget extends StatelessWidget {
@@ -25,6 +26,7 @@ class AppWidget extends StatelessWidget {
           '/admin': (context) => AdminPage(),
           '/equip': (context) => EquipPage(),
           '/log': (context) => LogPage(),
+          '/search': (context) => SearchPage(),
         },
       ),
     );

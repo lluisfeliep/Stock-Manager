@@ -124,6 +124,35 @@ class _LogPageState extends State<LogPage> {
         child: Column(
           children: [
             Container(
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: Color(0xFF287D94),
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black26,
+                    blurRadius: 4,
+                    offset: Offset(0, 2),
+                  ),
+                ],
+              ),
+              padding: EdgeInsets.all(12),
+              child: Center(
+                child: Column(
+                  children: [
+                    Text(equipamentoNome, style: TextStyle(fontSize: 20)),
+                    Icon(Icons.image, size: 300),
+                  ],
+                ),
+              ),
+            ),
+            SizedBox(height: 16),
+            Container(
+              color: Color(0xFF319FBD),
+              width: double.infinity,
+              child: Center(child: Text("Log", style: TextStyle(fontSize: 30))),
+            ),
+            Container(
               color: Color(0xFF319FBD),
               padding: EdgeInsets.all(8),
               child: Row(

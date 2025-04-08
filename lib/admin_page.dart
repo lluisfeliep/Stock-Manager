@@ -275,7 +275,7 @@ class _AdminPageState extends State<AdminPage> {
         dados =
             snapshot.docs.map((doc) {
               return {
-                "id": doc.id, // Agora armazenamos o ID
+                "id": doc.id,
                 "username": doc["username"] ?? "Sem Nome",
                 "Admin": doc["Admin"] ?? false,
                 "PSala": doc["PSala"] ?? false,

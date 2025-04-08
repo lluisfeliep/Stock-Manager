@@ -54,7 +54,7 @@ class _CustomDrawerState extends State<CustomDrawer> {
               ),
             ),
             onTap: () {
-              Navigator.of(context).pushReplacementNamed('/');
+              Navigator.of(context).pushNamed('/search');
             },
           ),
           if (userData?["Admin"] == true)
@@ -70,7 +70,7 @@ class _CustomDrawerState extends State<CustomDrawer> {
                 ),
               ),
               onTap: () {
-                Navigator.of(context).pushReplacementNamed('/admin');
+                Navigator.of(context).pushNamed('/admin');
               },
             ),
           Spacer(),
