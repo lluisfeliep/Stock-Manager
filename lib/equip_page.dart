@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:numberpicker/numberpicker.dart';
 import 'package:provider/provider.dart';
 import 'package:stock_manager/drawer.dart';
 import 'package:stock_manager/user_provider.dart';
@@ -28,6 +29,7 @@ class _EquipPageState extends State<EquipPage> {
 
     TextEditingController textequipController = TextEditingController();
     TextEditingController textlocController = TextEditingController();
+    int quantidade = 1;
 
     String? selectedSetor;
 
@@ -52,6 +54,22 @@ class _EquipPageState extends State<EquipPage> {
                     decoration: InputDecoration(
                       labelText: 'Localização do equipamento',
                     ),
+                  ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      Text("Quantidade:"),
+                      NumberPicker(
+                        minValue: 1,
+                        maxValue: 100,
+                        value: quantidade,
+                        onChanged: (value) {
+                          setState(() {
+                            quantidade = value;
+                          });
+                        },
+                      ),
+                    ],
                   ),
                   DropdownButton<String>(
                     hint: Text("Setor"),
@@ -101,6 +119,7 @@ class _EquipPageState extends State<EquipPage> {
                         selectedSetor!,
                         textequipController.text,
                         textlocController.text,
+                        quantidade,
                       );
                       await _loadSetoresComEquipamentos(); // atualiza lista
                       Navigator.pop(context);
@@ -121,6 +140,7 @@ class _EquipPageState extends State<EquipPage> {
     String setorId,
     String nome,
     String local,
+    int quantidadeNova,
   ) async {
     final userData = Provider.of<UserProvider>(context, listen: false).userData;
     final userRef = FirebaseFirestore.instance
@@ -133,20 +153,74 @@ class _EquipPageState extends State<EquipPage> {
         .collection('setores')
         .doc(setorId);
 
-    final equipamentoRef = await FirebaseFirestore.instance
-        .collection('equipamentos')
-        .add({
-          'nome': nome,
-          'loc': local,
-          'data': DateTime.now(),
-          'setor': setorRef,
-        });
+    final query =
+        await FirebaseFirestore.instance
+            .collection('equipamentos')
+            .where('nome', isEqualTo: nome)
+            .limit(1)
+            .get();
 
-    await equipamentoRef.collection("log").add({
-      'comentario': 'Criado novo equipamento',
-      'data': DateTime.now(),
-      'user': userRef,
-    });
+    if (query.docs.isNotEmpty) {
+      final doc = query.docs.first;
+      int quantidadeAtual = doc['quantidade'] ?? 0;
+      List<dynamic> setoresExistentes = doc['setores'] ?? [];
+
+      bool setorEncontrado = false;
+
+      List<dynamic> setoresAtualizados =
+          setoresExistentes.map((entry) {
+            final ref = entry['ref'] as DocumentReference;
+            if (ref.path == setorRef.path) {
+              setorEncontrado = true;
+              return {
+                'ref': ref,
+                'quantidade': (entry['quantidade'] ?? 0) + quantidadeNova,
+                'loc': local,
+              };
+            }
+            return entry;
+          }).toList();
+
+      if (!setorEncontrado) {
+        setoresAtualizados.add({
+          'ref': setorRef,
+          'quantidade': quantidadeNova,
+          'loc': local,
+        });
+      }
+
+      await doc.reference.update({
+        'quantidade': quantidadeAtual + quantidadeNova,
+        'setores': setoresAtualizados,
+      });
+
+      await doc.reference.collection("log").add({
+        'comentario': 'Quantidade aumentada: +$quantidadeNova',
+        'data': DateTime.now(),
+        'user': userRef,
+        'setor': setorRef,
+        'loc': local,
+      });
+    } else {
+      final equipamentoRef = await FirebaseFirestore.instance
+          .collection('equipamentos')
+          .add({
+            'nome': nome,
+            'data': DateTime.now(),
+            'quantidade': quantidadeNova,
+            'setores': [
+              {'ref': setorRef, 'quantidade': quantidadeNova, 'loc': local},
+            ],
+          });
+
+      await equipamentoRef.collection("log").add({
+        'comentario': 'Criado novo equipamento',
+        'data': DateTime.now(),
+        'user': userRef,
+        'setor': setorRef,
+        'loc': local,
+      });
+    }
   }
 
   Future<String> _criarNovoSetor(String salaId) async {
@@ -188,6 +262,9 @@ class _EquipPageState extends State<EquipPage> {
               .collection('setores')
               .get();
 
+      final equipamentosSnapshot =
+          await firestore.collection('equipamentos').get();
+
       List<Map<String, dynamic>> tempList = [];
 
       for (var setorDoc in setoresSnapshot.docs) {
@@ -200,26 +277,27 @@ class _EquipPageState extends State<EquipPage> {
             .collection('setores')
             .doc(setorId);
 
-        // Buscar equipamentos com referência ao setor atual
-        QuerySnapshot equipamentosSnapshot =
-            await firestore
-                .collection('equipamentos')
-                .where('setor', isEqualTo: setorRef)
-                .get();
+        List<Map<String, dynamic>> equipamentosDoSetor = [];
 
-        List<Map<String, dynamic>> equipamentos =
-            equipamentosSnapshot.docs.map((equipDoc) {
-              return {
+        for (var equipDoc in equipamentosSnapshot.docs) {
+          final List<dynamic> setores = equipDoc['setores'] ?? [];
+
+          for (var entry in setores) {
+            if (entry['ref'].path == setorRef.path) {
+              equipamentosDoSetor.add({
                 'nome': equipDoc['nome'],
-                'loc': equipDoc['loc'],
+                'loc': entry['loc'],
+                'quantidade': entry['quantidade'],
                 'id': equipDoc.id,
-              };
-            }).toList();
+              });
+            }
+          }
+        }
 
         tempList.add({
           'setorNome': setorNome,
           'setorId': setorId,
-          'equipamentos': equipamentos,
+          'equipamentos': equipamentosDoSetor,
         });
       }
 
@@ -285,6 +363,10 @@ class _EquipPageState extends State<EquipPage> {
                                       'Localização: ${equip['loc']}',
                                     ),
                                     leading: Icon(Icons.build),
+                                    trailing: Text(
+                                      equip['quantidade'].toString(),
+                                      style: TextStyle(fontSize: 15),
+                                    ),
                                   ),
                                   onTap: () {
                                     Navigator.of(context).pushNamed(

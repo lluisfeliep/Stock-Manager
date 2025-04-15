@@ -16,6 +16,24 @@ class _SearchPageState extends State<SearchPage> {
   List<Map<String, dynamic>> dados = [];
   List<Map<String, dynamic>> dadosFiltrados = [];
 
+  void _shownewlogdialog() {
+    showDialog(
+      context: context,
+      builder: (builder) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: Text("Novo uso"),
+              content: TextField(
+                decoration: InputDecoration(labelText: "Comentario"),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   void _buscarEqui() async {
     try {
       QuerySnapshot snapshot =
@@ -24,26 +42,62 @@ class _SearchPageState extends State<SearchPage> {
       List<Map<String, dynamic>> tempDados = [];
 
       for (var doc in snapshot.docs) {
-        DocumentReference setorRef = doc["setor"];
-        DocumentSnapshot setorSnap = await setorRef.get();
+        final String nomeEquip = doc["nome"];
+        final String equipId = doc.id;
+        final List<dynamic> setores = doc["setores"] ?? [];
 
-        String setorNome = setorSnap["nome"];
+        for (var entry in setores) {
+          try {
+            final refData = entry['ref'];
+            DocumentReference setorRef;
 
-        List<String> pathParts = setorRef.path.split('/');
-        String salaId = pathParts[1];
+            if (refData is DocumentReference) {
+              setorRef = refData;
+            } else if (refData is Map && refData.containsKey('_path')) {
+              setorRef = FirebaseFirestore.instance.doc(refData['_path']);
+            } else {
+              continue;
+            }
 
-        DocumentSnapshot salaSnap =
-            await _firestore.collection('salas').doc(salaId).get();
-        String salaNome = salaSnap["nome"];
+            DocumentSnapshot setorSnap = await setorRef.get();
+            String setorNome = setorSnap["nome"];
 
-        tempDados.add({
-          "id": doc.id,
-          "equip": doc["nome"],
-          "setor": "$salaNome / $setorNome",
-          "loc": doc["loc"],
-        });
+            List<String> pathParts = setorRef.path.split('/');
+            String salaId = pathParts[1];
+            DocumentSnapshot salaSnap =
+                await _firestore.collection('salas').doc(salaId).get();
+            String salaNome = salaSnap["nome"];
+
+            tempDados.add({
+              "id": equipId,
+              "equip": nomeEquip,
+              "setor": "$salaNome / $setorNome",
+              "loc": entry["loc"] ?? "",
+              "quantidade": entry["quantidade"] ?? 0,
+            });
+          } catch (e) {
+            showDialog(
+              context: context,
+              builder:
+                  (context) => AlertDialog(
+                    title: Text("Erro"),
+                    content: Text("$e"),
+                    actions: [
+                      TextButton(
+                        onPressed: () {
+                          Navigator.of(context).pop(); // Fecha o diálogo
+                        },
+                        child: Text("OK"),
+                      ),
+                    ],
+                  ),
+            );
+            continue;
+          }
+        }
       }
 
+      // Ordena por sala/setor numericamente
       tempDados.sort((a, b) {
         String salaSetorA = a['setor'];
         String salaSetorB = b['setor'];
@@ -152,7 +206,21 @@ class _SearchPageState extends State<SearchPage> {
               child: Row(
                 children: [
                   Expanded(
-                    child: Center(
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'Qtd',
+                        style: TextStyle(
+                          color: Colors.black,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    flex: 3,
+                    child: Align(
+                      alignment: Alignment.center,
                       child: Text(
                         'Nome',
                         style: TextStyle(
@@ -163,7 +231,9 @@ class _SearchPageState extends State<SearchPage> {
                     ),
                   ),
                   Expanded(
-                    child: Center(
+                    flex: 3,
+                    child: Align(
+                      alignment: Alignment.center,
                       child: Text(
                         'Localização',
                         style: TextStyle(
@@ -188,9 +258,18 @@ class _SearchPageState extends State<SearchPage> {
                               : Color(0xFF77C8DE),
                       padding: EdgeInsets.all(8),
                       child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceAround,
                         children: [
                           Flexible(
+                            child: Align(
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                dadosFiltrados[index]["quantidade"].toString(),
+                                style: TextStyle(fontSize: 16),
+                              ),
+                            ),
+                          ),
+                          Flexible(
+                            flex: 3,
                             child: Center(
                               child: Text(
                                 dadosFiltrados[index]["equip"],
@@ -199,7 +278,9 @@ class _SearchPageState extends State<SearchPage> {
                             ),
                           ),
                           Flexible(
-                            child: Center(
+                            flex: 3,
+                            child: Align(
+                              alignment: Alignment.center,
                               child: Column(
                                 children: [
                                   Text(
@@ -222,6 +303,9 @@ class _SearchPageState extends State<SearchPage> {
                         '/log',
                         arguments: {"equipId": dadosFiltrados[index]["id"]},
                       );
+                    },
+                    onLongPress: () {
+                      _shownewlogdialog();
                     },
                   );
                 },

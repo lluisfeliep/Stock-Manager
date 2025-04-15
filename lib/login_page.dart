@@ -35,7 +35,7 @@ class LoginPageState extends State<LoginPage> {
 
         // Armazenar dados no Provider
         Provider.of<UserProvider>(context, listen: false).setUser(userData);
-
+        if (!mounted) return;
         Navigator.pushReplacementNamed(context, '/home');
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -43,6 +43,7 @@ class LoginPageState extends State<LoginPage> {
         );
       }
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Erro ao fazer login: $e')));
