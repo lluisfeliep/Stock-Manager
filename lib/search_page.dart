@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:stock_manager/drawer.dart';
+import 'package:provider/provider.dart';
+import 'package:stock_manager/user_provider.dart';
 
 class SearchPage extends StatefulWidget {
   const SearchPage({super.key});
@@ -12,21 +13,71 @@ class SearchPage extends StatefulWidget {
 class _SearchPageState extends State<SearchPage> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final TextEditingController _searchController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
 
   List<Map<String, dynamic>> dados = [];
   List<Map<String, dynamic>> dadosFiltrados = [];
+  DocumentSnapshot? _lastDocument;
+  bool _isLoading = false;
+  bool _hasMore = true;
+  final int _limit = 10;
 
-  void _shownewlogdialog() {
+  void _shownewlogdialog(
+    Map<String, dynamic> equipamento,
+    BuildContext context,
+  ) {
+    final TextEditingController comentarioController = TextEditingController();
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+
     showDialog(
       context: context,
-      builder: (builder) {
+      builder: (context) {
         return StatefulBuilder(
           builder: (context, setState) {
             return AlertDialog(
               title: Text("Novo uso"),
               content: TextField(
-                decoration: InputDecoration(labelText: "Comentario"),
+                controller: comentarioController,
+                decoration: InputDecoration(labelText: "Comentário"),
               ),
+              actions: [
+                TextButton(
+                  onPressed: () async {
+                    String comentario = comentarioController.text.trim();
+                    if (comentario.isNotEmpty) {
+                      final userId = userProvider.userData?["uid"];
+                      final firestore = FirebaseFirestore.instance;
+
+                      final loc = equipamento["loc"];
+                      final setorRef =
+                          equipamento["setorRef"]; // Isso deve ser um DocumentReference
+
+                      final novaEntrada = {
+                        "comentario": comentario,
+                        "data": DateTime.now(),
+                        "loc": loc,
+                        "setor": setorRef,
+                        "user": firestore.doc('/Users/$userId'),
+                      };
+
+                      await firestore
+                          .collection('equipamentos')
+                          .doc(equipamento["id"])
+                          .collection('log')
+                          .add(novaEntrada);
+                    }
+
+                    Navigator.of(context).pop();
+                  },
+                  child: Text("Salvar"),
+                ),
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                  child: Text("Cancelar"),
+                ),
+              ],
             );
           },
         );
@@ -34,10 +85,21 @@ class _SearchPageState extends State<SearchPage> {
     );
   }
 
-  void _buscarEqui() async {
+  void _buscarEqui({bool append = false}) async {
+    if (_isLoading || !_hasMore) return;
+    setState(() => _isLoading = true);
+
     try {
-      QuerySnapshot snapshot =
-          await _firestore.collection('equipamentos').get();
+      Query query = _firestore
+          .collection('equipamentos')
+          .orderBy('nome')
+          .limit(_limit);
+
+      if (_lastDocument != null) {
+        query = query.startAfterDocument(_lastDocument!);
+      }
+
+      QuerySnapshot snapshot = await query.get();
 
       List<Map<String, dynamic>> tempDados = [];
 
@@ -62,6 +124,7 @@ class _SearchPageState extends State<SearchPage> {
             DocumentSnapshot setorSnap = await setorRef.get();
             String setorNome = setorSnap["nome"];
 
+            // A string de nome do setor e sala
             List<String> pathParts = setorRef.path.split('/');
             String salaId = pathParts[1];
             DocumentSnapshot salaSnap =
@@ -71,33 +134,18 @@ class _SearchPageState extends State<SearchPage> {
             tempDados.add({
               "id": equipId,
               "equip": nomeEquip,
-              "setor": "$salaNome / $setorNome",
+              "setor":
+                  "$salaNome / $setorNome", // Aqui você ainda está usando a string
+              "setorRef": setorRef, // Aqui você vai armazenar a referência
               "loc": entry["loc"] ?? "",
               "quantidade": entry["quantidade"] ?? 0,
             });
           } catch (e) {
-            showDialog(
-              context: context,
-              builder:
-                  (context) => AlertDialog(
-                    title: Text("Erro"),
-                    content: Text("$e"),
-                    actions: [
-                      TextButton(
-                        onPressed: () {
-                          Navigator.of(context).pop(); // Fecha o diálogo
-                        },
-                        child: Text("OK"),
-                      ),
-                    ],
-                  ),
-            );
             continue;
           }
         }
       }
 
-      // Ordena por sala/setor numericamente
       tempDados.sort((a, b) {
         String salaSetorA = a['setor'];
         String salaSetorB = b['setor'];
@@ -122,25 +170,24 @@ class _SearchPageState extends State<SearchPage> {
         }
       });
 
-      setState(() {
-        dados = tempDados;
-        dadosFiltrados = tempDados;
-      });
+      if (snapshot.docs.isNotEmpty) {
+        _lastDocument = snapshot.docs.last;
+        setState(() {
+          if (append) {
+            dados.addAll(tempDados);
+            dadosFiltrados.addAll(tempDados);
+          } else {
+            dados = tempDados;
+            dadosFiltrados = tempDados;
+          }
+        });
+      }
+
+      if (snapshot.docs.length < _limit) _hasMore = false;
     } catch (e) {
-      showDialog(
-        context: context,
-        builder:
-            (context) => AlertDialog(
-              title: Text("Erro"),
-              content: Text("$e"),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: Text("OK"),
-                ),
-              ],
-            ),
-      );
+      // handle error
+    } finally {
+      setState(() => _isLoading = false);
     }
   }
 
@@ -162,6 +209,12 @@ class _SearchPageState extends State<SearchPage> {
   void initState() {
     super.initState();
     _buscarEqui();
+    _scrollController.addListener(() {
+      if (_scrollController.position.pixels >=
+          _scrollController.position.maxScrollExtent - 200) {
+        _buscarEqui(append: true);
+      }
+    });
     _searchController.addListener(() {
       _filtrarDados(_searchController.text);
     });
@@ -169,6 +222,7 @@ class _SearchPageState extends State<SearchPage> {
 
   @override
   void dispose() {
+    _scrollController.dispose();
     _searchController.dispose();
     super.dispose();
   }
@@ -180,7 +234,6 @@ class _SearchPageState extends State<SearchPage> {
         title: Text("Equipamentos"),
         backgroundColor: Color(0xFF63bfd8),
       ),
-      drawer: CustomDrawer(),
       body: Container(
         color: Color(0xFFDDFFF7),
         padding: EdgeInsets.all(8),
@@ -248,66 +301,77 @@ class _SearchPageState extends State<SearchPage> {
             ),
             Expanded(
               child: ListView.builder(
-                itemCount: dadosFiltrados.length,
+                controller: _scrollController,
+                itemCount: dadosFiltrados.length + (_isLoading ? 1 : 0),
                 itemBuilder: (context, index) {
-                  return GestureDetector(
-                    child: Container(
-                      color:
-                          index % 2 == 0
-                              ? Color(0xFF9FD9E8)
-                              : Color(0xFF77C8DE),
-                      padding: EdgeInsets.all(8),
-                      child: Row(
-                        children: [
-                          Flexible(
-                            child: Align(
-                              alignment: Alignment.centerLeft,
-                              child: Text(
-                                dadosFiltrados[index]["quantidade"].toString(),
-                                style: TextStyle(fontSize: 16),
+                  if (index < dadosFiltrados.length) {
+                    return GestureDetector(
+                      child: Container(
+                        color:
+                            index % 2 == 0
+                                ? Color(0xFF9FD9E8)
+                                : Color(0xFF77C8DE),
+                        padding: EdgeInsets.all(8),
+                        child: Row(
+                          children: [
+                            Flexible(
+                              child: Align(
+                                alignment: Alignment.centerLeft,
+                                child: Text(
+                                  dadosFiltrados[index]["quantidade"]
+                                      .toString(),
+                                  style: TextStyle(fontSize: 16),
+                                ),
                               ),
                             ),
-                          ),
-                          Flexible(
-                            flex: 3,
-                            child: Center(
-                              child: Text(
-                                dadosFiltrados[index]["equip"],
-                                style: TextStyle(fontSize: 16),
+                            Flexible(
+                              flex: 3,
+                              child: Center(
+                                child: Text(
+                                  dadosFiltrados[index]["equip"],
+                                  style: TextStyle(fontSize: 16),
+                                ),
                               ),
                             ),
-                          ),
-                          Flexible(
-                            flex: 3,
-                            child: Align(
-                              alignment: Alignment.center,
-                              child: Column(
-                                children: [
-                                  Text(
-                                    dadosFiltrados[index]["setor"],
-                                    style: TextStyle(fontSize: 16),
-                                  ),
-                                  Text(
-                                    dadosFiltrados[index]["loc"],
-                                    style: TextStyle(fontSize: 16),
-                                  ),
-                                ],
+                            Flexible(
+                              flex: 3,
+                              child: Align(
+                                alignment: Alignment.center,
+                                child: Column(
+                                  children: [
+                                    Text(
+                                      dadosFiltrados[index]["setor"],
+                                      style: TextStyle(fontSize: 16),
+                                    ),
+                                    Text(
+                                      dadosFiltrados[index]["loc"],
+                                      style: TextStyle(fontSize: 16),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
-                    onTap: () {
-                      Navigator.of(context).pushNamed(
-                        '/log',
-                        arguments: {"equipId": dadosFiltrados[index]["id"]},
-                      );
-                    },
-                    onLongPress: () {
-                      _shownewlogdialog();
-                    },
-                  );
+                      onTap: () {
+                        Navigator.of(context).pushNamed(
+                          '/log',
+                          arguments: {"equipId": dadosFiltrados[index]["id"]},
+                        );
+                      },
+                      onLongPress: () {
+                        _shownewlogdialog(dadosFiltrados[index], context);
+                      },
+                    );
+                  } else {
+                    return Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: CircularProgressIndicator(),
+                      ),
+                    );
+                  }
                 },
               ),
             ),

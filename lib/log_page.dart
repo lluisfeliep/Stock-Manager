@@ -1,6 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:stock_manager/drawer.dart';
 import 'package:intl/intl.dart';
 
 class LogPage extends StatefulWidget {
@@ -123,7 +122,10 @@ class _LogPageState extends State<LogPage> {
 
       for (var doc in logsnapshot.docs) {
         var userRef = doc['user'];
+        var setorRef = doc['setor'];
         String username = '';
+        String setor = '';
+        String sala = '';
 
         if (userRef is DocumentReference) {
           DocumentSnapshot userSnapshot = await userRef.get();
@@ -133,20 +135,46 @@ class _LogPageState extends State<LogPage> {
                   : 'Usuário desconhecido';
         }
 
+        if (setorRef is DocumentReference) {
+          // Pega o nome do setor
+          DocumentSnapshot setorSnapshot = await setorRef.get();
+          setor =
+              setorSnapshot.exists
+                  ? setorSnapshot['nome'] ?? ''
+                  : 'Setor desconhecido';
+
+          // Sobe um nível e pega o nome da sala
+          DocumentReference salaRef =
+              setorRef
+                  .parent
+                  .parent!; // sobe de /setores/setor_3 para /salas/sala_1
+          DocumentSnapshot salaSnapshot = await salaRef.get();
+          sala =
+              salaSnapshot.exists
+                  ? salaSnapshot['nome'] ?? ''
+                  : 'Sala desconhecida';
+        }
+
         var rawDate = doc['data'];
-        String formattedDate = '';
+        String dataFormatada = '';
+        String horaFormatada = '';
         if (rawDate is Timestamp) {
-          formattedDate = DateFormat(
-            'dd/MM/yyyy HH:mm',
-          ).format(rawDate.toDate());
+          DateTime date = rawDate.toDate();
+          dataFormatada = DateFormat('dd/MM/yyyy').format(date);
+          horaFormatada = DateFormat('HH:mm').format(date);
         } else if (rawDate is String) {
-          formattedDate = rawDate;
+          // Se você salvar a string já formatada, pode separar via substring
+          dataFormatada = rawDate.split(' ')[0];
+          horaFormatada = rawDate.split(' ')[1];
         }
 
         tempLogs.add({
           'comentario': doc['comentario'] ?? '',
-          'data': formattedDate,
+          'data': dataFormatada,
+          'hora': horaFormatada,
           'user': username,
+          'setor': setor,
+          'sala': sala,
         });
       }
 
@@ -165,7 +193,6 @@ class _LogPageState extends State<LogPage> {
         title: Text(equipamentoNome),
         backgroundColor: Color(0xFF63bfd8),
       ),
-      drawer: CustomDrawer(),
       body: Container(
         color: Color(0xFFDDFFF7),
         padding: EdgeInsets.all(10),
@@ -277,6 +304,18 @@ class _LogPageState extends State<LogPage> {
                           flex: 2,
                           child: Center(
                             child: Text(
+                              'Localização',
+                              style: TextStyle(
+                                color: Colors.black,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          flex: 2,
+                          child: Center(
+                            child: Text(
                               'Data',
                               style: TextStyle(
                                 color: Colors.black,
@@ -301,17 +340,14 @@ class _LogPageState extends State<LogPage> {
                 color: index % 2 == 0 ? Color(0xFF9FD9E8) : Color(0xFF77C8DE),
                 padding: EdgeInsets.all(8),
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
-                    Flexible(
-                      flex: 2,
+                    Expanded(
                       child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Center(
-                            child: Text(
-                              logs[index]["comentario"],
-                              style: TextStyle(fontSize: 16),
-                            ),
+                          Text(
+                            logs[index]["comentario"],
+                            style: TextStyle(fontSize: 16),
                           ),
                           SizedBox(height: 4),
                           Text(
@@ -321,13 +357,32 @@ class _LogPageState extends State<LogPage> {
                         ],
                       ),
                     ),
-                    Flexible(
-                      flex: 2,
-                      child: Center(
-                        child: Text(
-                          logs[index]["data"],
-                          style: TextStyle(fontSize: 16),
-                        ),
+                    Expanded(
+                      child: Column(
+                        children: [
+                          Text(
+                            logs[index]["sala"],
+                            style: TextStyle(fontSize: 16),
+                          ),
+                          Text(
+                            logs[index]["setor"],
+                            style: TextStyle(fontSize: 16),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Expanded(
+                      child: Column(
+                        children: [
+                          Text(
+                            logs[index]["data"],
+                            style: TextStyle(fontSize: 16),
+                          ),
+                          Text(
+                            logs[index]["hora"],
+                            style: TextStyle(fontSize: 16),
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -336,6 +391,11 @@ class _LogPageState extends State<LogPage> {
             },
           ),
         ),
+      ),
+      floatingActionButton: FloatingActionButton(
+        backgroundColor: Color(0xFF319FBD),
+        child: Icon(Icons.edit),
+        onPressed: () {},
       ),
     );
   }

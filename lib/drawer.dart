@@ -27,20 +27,15 @@ class _CustomDrawerState extends State<CustomDrawer> {
               ),
             ),
           ),
-          GestureDetector(
-            child: Container(
-              color: Color(0xFF9FD9E8),
-              child: ListTile(
-                leading: Icon(Icons.inbox),
-                title: Text(
-                  "Salas",
-                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                ),
+          Container(
+            color: Color(0xFF9FD9E8),
+            child: ListTile(
+              leading: Icon(Icons.inbox),
+              title: Text(
+                "Salas",
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
               ),
             ),
-            onTap: () {
-              Navigator.of(context).pushReplacementNamed('/home');
-            },
           ),
           GestureDetector(
             child: Container(

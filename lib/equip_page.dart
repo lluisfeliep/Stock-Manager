@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:numberpicker/numberpicker.dart';
 import 'package:provider/provider.dart';
-import 'package:stock_manager/drawer.dart';
 import 'package:stock_manager/user_provider.dart';
 
 class EquipPage extends StatefulWidget {
@@ -195,7 +194,7 @@ class _EquipPageState extends State<EquipPage> {
       });
 
       await doc.reference.collection("log").add({
-        'comentario': 'Quantidade aumentada: +$quantidadeNova',
+        'comentario': '"Adicionado novo: +$quantidadeNova',
         'data': DateTime.now(),
         'user': userRef,
         'setor': setorRef,
@@ -221,6 +220,69 @@ class _EquipPageState extends State<EquipPage> {
         'loc': local,
       });
     }
+  }
+
+  void _shownewlogdialog(
+    Map<String, dynamic> equipamento,
+    BuildContext context,
+  ) {
+    final TextEditingController comentarioController = TextEditingController();
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: Text("Novo uso"),
+              content: TextField(
+                controller: comentarioController,
+                decoration: InputDecoration(labelText: "Comentário"),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () async {
+                    String comentario = comentarioController.text.trim();
+                    if (comentario.isNotEmpty) {
+                      final userId = userProvider.userData?["uid"];
+                      final firestore = FirebaseFirestore.instance;
+
+                      final loc = equipamento["loc"];
+                      final setorRef =
+                          equipamento["setorRef"]; // Isso deve ser um DocumentReference
+
+                      final novaEntrada = {
+                        "comentario": comentario,
+                        "data": DateTime.now(),
+                        "loc": loc,
+                        "setor": setorRef,
+                        "user": firestore.doc('/Users/$userId'),
+                      };
+
+                      await firestore
+                          .collection('equipamentos')
+                          .doc(equipamento["id"])
+                          .collection('log')
+                          .add(novaEntrada);
+                    }
+
+                    Navigator.of(context).pop();
+                  },
+                  child: Text("Salvar"),
+                ),
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                  child: Text("Cancelar"),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   Future<String> _criarNovoSetor(String salaId) async {
@@ -287,6 +349,7 @@ class _EquipPageState extends State<EquipPage> {
               equipamentosDoSetor.add({
                 'nome': equipDoc['nome'],
                 'loc': entry['loc'],
+                'setorRef': setorRef,
                 'quantidade': entry['quantidade'],
                 'id': equipDoc.id,
               });
@@ -333,7 +396,6 @@ class _EquipPageState extends State<EquipPage> {
         title: Text("Equipamentos"),
         backgroundColor: Color(0xFF63bfd8),
       ),
-      drawer: CustomDrawer(),
       body:
           setoresComEquipamentos.isEmpty
               ? Center(
@@ -374,6 +436,9 @@ class _EquipPageState extends State<EquipPage> {
                                       arguments: {'equipId': equip['id']},
                                     );
                                   },
+                                  onLongPress: () {
+                                    _shownewlogdialog(equip, context);
+                                  },
                                 ),
                               )
                               .toList(),
@@ -382,7 +447,7 @@ class _EquipPageState extends State<EquipPage> {
                 },
               ),
       floatingActionButton: FloatingActionButton(
-        backgroundColor: Color(0xFF63bfd8),
+        backgroundColor: Color(0xFF319FBD),
         onPressed: _showNewEquip,
         child: Icon(Icons.add),
       ),

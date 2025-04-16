@@ -2,7 +2,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:stock_manager/drawer.dart';
 
 class AdminPage extends StatefulWidget {
   const AdminPage({super.key});
@@ -226,7 +225,7 @@ class _AdminPageState extends State<AdminPage> {
   }
 
   void _deleteUser(String userId) async {
-    bool confirmDelete = await showDialog(
+    bool? confirmDelete = await showDialog(
       context: context,
       builder:
           (context) => AlertDialog(
@@ -244,6 +243,8 @@ class _AdminPageState extends State<AdminPage> {
             ],
           ),
     );
+
+    confirmDelete ??= false;
 
     if (confirmDelete) {
       try {
@@ -304,7 +305,6 @@ class _AdminPageState extends State<AdminPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text('Admin'), backgroundColor: Color(0xFF63bfd8)),
-      drawer: CustomDrawer(),
       body: Container(
         color: Color(0xFFDDFFF7),
         padding: EdgeInsets.all(10),
@@ -418,7 +418,7 @@ class _AdminPageState extends State<AdminPage> {
         ),
       ),
       floatingActionButton: FloatingActionButton(
-        backgroundColor: Color(0xFF63bfd8),
+        backgroundColor: Color(0xFF319FBD),
         onPressed: _showRegisterDialog,
         child: Icon(Icons.add),
       ),
