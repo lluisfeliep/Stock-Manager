@@ -7,6 +7,7 @@ import 'package:stock_manager/log_page.dart';
 import 'package:stock_manager/login_page.dart';
 import 'package:stock_manager/search_page.dart';
 import 'package:stock_manager/user_provider.dart';
+import 'package:stock_manager/wrapper.dart';
 
 class AppWidget extends StatelessWidget {
   @override
@@ -19,9 +20,9 @@ class AppWidget extends StatelessWidget {
           brightness: Brightness.light,
           scaffoldBackgroundColor: Color(0xFFDDFFF7),
         ),
-        initialRoute: '/',
+        home: Wrapper(),
         routes: {
-          '/': (context) => LoginPage(),
+          '/login': (context) => LoginPage(),
           '/home': (context) => HomePage(),
           '/admin': (context) => AdminPage(),
           '/equip': (context) => EquipPage(),

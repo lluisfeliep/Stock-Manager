@@ -14,18 +14,18 @@ class LoginPage extends StatefulWidget {
 class LoginPageState extends State<LoginPage> {
   String username = '';
   String password = '';
+  bool loading = false; // Novo estado de carregamento
 
   Future<void> login() async {
+    setState(() => loading = true);
     try {
-      String email = "$username@example.com"; // Transformar username em email
+      String email = "$username@example.com";
 
-      // Autenticar no Firebase Authentication
       UserCredential userCredential = await FirebaseAuth.instance
           .signInWithEmailAndPassword(email: email, password: password);
 
       String uid = userCredential.user!.uid;
 
-      // Buscar permissões no Firestore
       DocumentSnapshot userDoc =
           await FirebaseFirestore.instance.collection('Users').doc(uid).get();
 
@@ -33,7 +33,6 @@ class LoginPageState extends State<LoginPage> {
         Map<String, dynamic> userData = userDoc.data() as Map<String, dynamic>;
         userData['uid'] = userDoc.id;
 
-        // Armazenar dados no Provider
         Provider.of<UserProvider>(context, listen: false).setUser(userData);
         if (!mounted) return;
         Navigator.pushReplacementNamed(context, '/home');
@@ -47,11 +46,17 @@ class LoginPageState extends State<LoginPage> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Erro ao fazer login: $e')));
+    } finally {
+      if (mounted) setState(() => loading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (loading) {
+      return Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
     return Scaffold(
       body: SingleChildScrollView(
         child: ConstrainedBox(
@@ -104,7 +109,7 @@ class LoginPageState extends State<LoginPage> {
                           decoration: InputDecoration(
                             labelText: 'Password',
                             filled: true,
-                            fillColor: Colors.white, // Campo branco
+                            fillColor: Colors.white,
                             border: OutlineInputBorder(),
                           ),
                         ),
@@ -113,7 +118,7 @@ class LoginPageState extends State<LoginPage> {
                           mainAxisAlignment: MainAxisAlignment.end,
                           children: [
                             ElevatedButton(
-                              onPressed: login, // Chamando a função de login
+                              onPressed: login,
                               child: const Text("Entrar"),
                             ),
                           ],
