@@ -38,10 +38,10 @@ class _LogPageState extends State<LogPage> {
       final dadosEquipamento =
           equipamentoSnapshot.data() as Map<String, dynamic>;
       final String nome = dadosEquipamento['nome'] ?? 'Nome Desconhecido';
-      final int quantidadeTotal = dadosEquipamento['quantidade'] ?? 0;
       final List<dynamic> setores = dadosEquipamento['setores'] ?? [];
 
       List<Map<String, dynamic>> setoresInfo = [];
+      int quantidadeTotalCalculada = 0;
 
       for (var entry in setores) {
         try {
@@ -66,10 +66,13 @@ class _LogPageState extends State<LogPage> {
               await firestore.collection('salas').doc(salaId).get();
           final salaNome = salaSnap['nome'];
 
+          int quantidade = entry['quantidade'] ?? 0;
+          quantidadeTotalCalculada += quantidade;
+
           setoresInfo.add({
             'sala': salaNome,
             'setor': setorNome,
-            'quantidade': entry['quantidade'] ?? 0,
+            'quantidade': quantidade,
             'loc': entry['loc'] ?? '',
           });
         } catch (e) {
@@ -81,7 +84,7 @@ class _LogPageState extends State<LogPage> {
       setState(() {
         equipamentoNome = nome;
         equipamentoData = {
-          'quantidade': quantidadeTotal,
+          'quantidade': quantidadeTotalCalculada,
           'setoresInfo': setoresInfo,
         };
       });

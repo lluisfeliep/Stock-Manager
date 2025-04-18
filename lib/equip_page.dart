@@ -13,24 +13,50 @@ class _EquipPageState extends State<EquipPage> {
   late FirebaseFirestore firestore;
   bool isLoading = true;
   List<Map<String, dynamic>> setoresComEquipamentos = [];
+  Map<String, dynamic>? userData; // <- Adicionado
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     firestore = FirebaseFirestore.instance;
-    _loadSetoresComEquipamentos();
+    if (userData == null) {
+      userData = Provider.of<UserProvider>(context).userData;
+      _loadSetoresComEquipamentos();
+    }
   }
 
-  void _showNewEquip() {
+  void _showNewEquip() async {
     final Map<String, dynamic> args =
         ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
     final String salaId = args["id"] as String;
+    List<String> nomesEquipamentos = [];
+    List<String> locaisEquipamentos = [];
 
     TextEditingController textequipController = TextEditingController();
     TextEditingController textlocController = TextEditingController();
     int quantidade = 1;
 
     String? selectedSetor;
+
+    final equipamentosSnapshot =
+        await FirebaseFirestore.instance.collection('equipamentos').get();
+
+    for (var doc in equipamentosSnapshot.docs) {
+      final nome = doc['nome'];
+      if (nome != null && !nomesEquipamentos.contains(nome)) {
+        nomesEquipamentos.add(nome);
+      }
+
+      final setores = doc['setores'];
+      if (setores is List) {
+        for (var setor in setores) {
+          final loc = setor['loc'];
+          if (loc != null && !locaisEquipamentos.contains(loc)) {
+            locaisEquipamentos.add(loc);
+          }
+        }
+      }
+    }
 
     showDialog(
       context: context,
@@ -39,75 +65,196 @@ class _EquipPageState extends State<EquipPage> {
           builder: (context, setState) {
             return AlertDialog(
               title: Text("Criar novo item"),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(
-                    controller: textequipController,
-                    decoration: InputDecoration(
-                      labelText: 'Nome do Equipamento',
-                    ),
-                  ),
-                  TextField(
-                    controller: textlocController,
-                    decoration: InputDecoration(
-                      labelText: 'Localização do equipamento',
-                    ),
-                  ),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      Text("Quantidade:"),
-                      NumberPicker(
-                        minValue: 1,
-                        maxValue: 100,
-                        value: quantidade,
-                        onChanged: (value) {
-                          setState(() {
-                            quantidade = value;
-                          });
-                        },
-                      ),
-                    ],
-                  ),
-                  DropdownButton<String>(
-                    hint: Text("Setor"),
-                    value: selectedSetor,
-                    isExpanded: true,
-                    items: [
-                      ...setoresComEquipamentos.map((setor) {
-                        return DropdownMenuItem<String>(
-                          value: setor['setorId'],
-                          child: Text(setor['setorNome']),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Nome do Equipamento
+                    RawAutocomplete<String>(
+                      textEditingController: textequipController,
+                      focusNode: FocusNode(),
+                      optionsBuilder: (TextEditingValue textEditingValue) {
+                        if (textEditingValue.text == '') {
+                          return const Iterable<String>.empty();
+                        }
+                        return nomesEquipamentos.where((String option) {
+                          return option.toLowerCase().contains(
+                            textEditingValue.text.toLowerCase(),
+                          );
+                        });
+                      },
+                      fieldViewBuilder: (
+                        context,
+                        controller,
+                        focusNode,
+                        onFieldSubmitted,
+                      ) {
+                        return SizedBox(
+                          width: MediaQuery.of(context).size.width * 0.8,
+                          child: TextField(
+                            controller: controller,
+                            focusNode: focusNode,
+                            decoration: InputDecoration(
+                              labelText: 'Nome do Equipamento',
+                            ),
+                          ),
                         );
-                      }),
-                      DropdownMenuItem<String>(
-                        value: 'add_new',
-                        child: Row(
-                          children: [
-                            Icon(Icons.add),
-                            Text("Adicionar novo setor"),
-                          ],
+                      },
+                      optionsViewBuilder: (context, onSelected, options) {
+                        return Align(
+                          alignment: Alignment.topLeft,
+                          child: Material(
+                            child: Container(
+                              width: MediaQuery.of(context).size.width * 0.8,
+                              color: Colors.white,
+                              child: ListView.builder(
+                                padding: EdgeInsets.zero,
+                                itemCount: options.length,
+                                shrinkWrap: true,
+                                itemBuilder: (context, index) {
+                                  final String option = options.elementAt(
+                                    index,
+                                  );
+                                  return ListTile(
+                                    title: Text(option),
+                                    onTap: () {
+                                      onSelected(option);
+                                    },
+                                  );
+                                },
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                    SizedBox(height: 16),
+
+                    // Localização
+                    RawAutocomplete<String>(
+                      textEditingController: textlocController,
+                      focusNode: FocusNode(),
+                      optionsBuilder: (TextEditingValue textEditingValue) {
+                        if (textEditingValue.text == '') {
+                          return const Iterable<String>.empty();
+                        }
+                        return locaisEquipamentos.where((String option) {
+                          return option.toLowerCase().contains(
+                            textEditingValue.text.toLowerCase(),
+                          );
+                        });
+                      },
+                      fieldViewBuilder: (
+                        context,
+                        controller,
+                        focusNode,
+                        onFieldSubmitted,
+                      ) {
+                        return SizedBox(
+                          width: MediaQuery.of(context).size.width * 0.8,
+                          child: TextField(
+                            controller: controller,
+                            focusNode: focusNode,
+                            decoration: InputDecoration(
+                              labelText: 'Localização do Equipamento',
+                            ),
+                          ),
+                        );
+                      },
+                      optionsViewBuilder: (context, onSelected, options) {
+                        return Align(
+                          alignment: Alignment.topLeft,
+                          child: Material(
+                            child: Container(
+                              width: MediaQuery.of(context).size.width * 0.8,
+                              color: Colors.white,
+                              child: ListView.builder(
+                                padding: EdgeInsets.zero,
+                                itemCount: options.length,
+                                shrinkWrap: true,
+                                itemBuilder: (context, index) {
+                                  final String option = options.elementAt(
+                                    index,
+                                  );
+                                  return ListTile(
+                                    title: Text(option),
+                                    onTap: () {
+                                      onSelected(option);
+                                    },
+                                  );
+                                },
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                    SizedBox(height: 16),
+
+                    // Quantidade
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        Text("Quantidade:"),
+                        NumberPicker(
+                          minValue: 1,
+                          maxValue: 100,
+                          value: quantidade,
+                          onChanged: (value) {
+                            setState(() {
+                              quantidade = value;
+                            });
+                          },
                         ),
-                      ),
-                    ],
-                    onChanged: (value) async {
-                      if (value == 'add_new') {
-                        final newSetorId = await _criarNovoSetor(salaId);
-                        await _loadSetoresComEquipamentos(); // Atualiza lista
-                        setState(() {
-                          selectedSetor = newSetorId;
-                        });
-                      } else {
-                        setState(() {
-                          selectedSetor = value;
-                        });
-                      }
-                    },
-                  ),
-                ],
+                      ],
+                    ),
+
+                    // Dropdown de setor
+                    DropdownButton<String>(
+                      hint: Text("Setor"),
+                      value: selectedSetor,
+                      isExpanded: true,
+                      items: [
+                        ...setoresComEquipamentos.map((setor) {
+                          return DropdownMenuItem<String>(
+                            value: setor['setorId'],
+                            child: Text(setor['setorNome']),
+                          );
+                        }),
+                        DropdownMenuItem<String>(
+                          value: 'add_new',
+                          child: Row(
+                            children: [
+                              Icon(Icons.add),
+                              Text("Adicionar novo setor"),
+                            ],
+                          ),
+                        ),
+                      ],
+                      onChanged: (value) async {
+                        if (value == 'add_new') {
+                          final newSetorId = await _criarNovoSetor(salaId);
+                          await _loadSetoresComEquipamentos();
+                          setState(() {
+                            selectedSetor = newSetorId;
+                          });
+                        } else {
+                          setState(() {
+                            selectedSetor = value;
+                          });
+                        }
+                      },
+                    ),
+                  ],
+                ),
               ),
               actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                  child: Text("Cancelar"),
+                ),
                 TextButton(
                   onPressed: () async {
                     if (selectedSetor != null &&
@@ -120,7 +267,7 @@ class _EquipPageState extends State<EquipPage> {
                         textlocController.text,
                         quantidade,
                       );
-                      await _loadSetoresComEquipamentos(); // atualiza lista
+                      await _loadSetoresComEquipamentos();
                       Navigator.pop(context);
                     }
                   },
@@ -141,7 +288,6 @@ class _EquipPageState extends State<EquipPage> {
     String local,
     int quantidadeNova,
   ) async {
-    final userData = Provider.of<UserProvider>(context, listen: false).userData;
     final userRef = FirebaseFirestore.instance
         .collection('Users')
         .doc(userData?["uid"]);
@@ -161,7 +307,6 @@ class _EquipPageState extends State<EquipPage> {
 
     if (query.docs.isNotEmpty) {
       final doc = query.docs.first;
-      int quantidadeAtual = doc['quantidade'] ?? 0;
       List<dynamic> setoresExistentes = doc['setores'] ?? [];
 
       bool setorEncontrado = false;
@@ -171,11 +316,22 @@ class _EquipPageState extends State<EquipPage> {
             final ref = entry['ref'] as DocumentReference;
             if (ref.path == setorRef.path) {
               setorEncontrado = true;
-              return {
+              int quantidadeAtual = (entry['quantidade'] ?? 0);
+              int novaQuantidade = quantidadeAtual + quantidadeNova;
+
+              // Clona o map e atualiza os campos
+              Map<String, dynamic> atualizado = {
                 'ref': ref,
-                'quantidade': (entry['quantidade'] ?? 0) + quantidadeNova,
+                'quantidade': novaQuantidade,
                 'loc': local,
               };
+
+              // Se existia algum campo extra como 'inativo', só mantém se necessário
+              if (novaQuantidade <= 0 && entry['inativo'] == true) {
+                atualizado['inativo'] = true;
+              }
+
+              return atualizado;
             }
             return entry;
           }).toList();
@@ -188,13 +344,10 @@ class _EquipPageState extends State<EquipPage> {
         });
       }
 
-      await doc.reference.update({
-        'quantidade': quantidadeAtual + quantidadeNova,
-        'setores': setoresAtualizados,
-      });
+      await doc.reference.update({'setores': setoresAtualizados});
 
       await doc.reference.collection("log").add({
-        'comentario': '"Adicionado novo: +$quantidadeNova',
+        'comentario': 'Adicionado novo: +$quantidadeNova',
         'data': DateTime.now(),
         'user': userRef,
         'setor': setorRef,
@@ -206,7 +359,6 @@ class _EquipPageState extends State<EquipPage> {
           .add({
             'nome': nome,
             'data': DateTime.now(),
-            'quantidade': quantidadeNova,
             'setores': [
               {'ref': setorRef, 'quantidade': quantidadeNova, 'loc': local},
             ],
@@ -222,60 +374,119 @@ class _EquipPageState extends State<EquipPage> {
     }
   }
 
-  void _shownewlogdialog(
+  Future<void> _shownewlogdialog(
     Map<String, dynamic> equipamento,
     BuildContext context,
   ) {
     final TextEditingController comentarioController = TextEditingController();
-    final userProvider = Provider.of<UserProvider>(context, listen: false);
+    int quantidade = 0;
 
-    showDialog(
+    return showDialog(
       context: context,
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setState) {
             return AlertDialog(
               title: Text("Novo uso"),
-              content: TextField(
-                controller: comentarioController,
-                decoration: InputDecoration(labelText: "Comentário"),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: comentarioController,
+                    decoration: InputDecoration(labelText: "Comentário"),
+                  ),
+                  Row(
+                    children: [
+                      Text("Quantidade usada:"),
+                      NumberPicker(
+                        minValue: 0,
+                        maxValue: equipamento['quantidade'],
+                        value: quantidade,
+                        onChanged: (value) {
+                          setState(() {
+                            quantidade = value;
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+                ],
               ),
               actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                  child: Text("Cancelar"),
+                ),
                 TextButton(
                   onPressed: () async {
                     String comentario = comentarioController.text.trim();
                     if (comentario.isNotEmpty) {
-                      final userId = userProvider.userData?["uid"];
+                      String userId = userData?["uid"];
                       final firestore = FirebaseFirestore.instance;
 
                       final loc = equipamento["loc"];
-                      final setorRef =
-                          equipamento["setorRef"]; // Isso deve ser um DocumentReference
+                      final setorRef = equipamento["setorRef"];
+
+                      final docRef = firestore
+                          .collection('equipamentos')
+                          .doc(equipamento["id"]);
 
                       final novaEntrada = {
-                        "comentario": comentario,
+                        "comentario":
+                            quantidade == 0
+                                ? comentario
+                                : "$comentario -$quantidade",
                         "data": DateTime.now(),
                         "loc": loc,
                         "setor": setorRef,
                         "user": firestore.doc('/Users/$userId'),
                       };
 
-                      await firestore
-                          .collection('equipamentos')
-                          .doc(equipamento["id"])
-                          .collection('log')
-                          .add(novaEntrada);
+                      // Adiciona o log
+                      await docRef.collection('log').add(novaEntrada);
+
+                      // Atualiza setores, se necessário
+                      final docSnapshot = await docRef.get();
+                      if (docSnapshot.exists) {
+                        final data = docSnapshot.data() as Map<String, dynamic>;
+                        List<dynamic> setores = data["setores"] ?? [];
+
+                        for (var setor in setores) {
+                          final ref = setor["ref"];
+                          if (ref is DocumentReference &&
+                              ref.path == setorRef.path &&
+                              setor.containsKey("quantidade")) {
+                            if (quantidade > 0) {
+                              setor["quantidade"] =
+                                  (setor["quantidade"] ?? 0) - quantidade;
+                              if (setor["quantidade"] < 0) {
+                                setor["quantidade"] = 0;
+                              }
+
+                              // Se zerou, marca como inativo
+                              if (setor["quantidade"] == 0) {
+                                setor["inativo"] = true;
+                              }
+                            } else {
+                              // Se quantidade usada é 0, mas no banco a quantidade já era 0
+                              if ((setor["quantidade"] ?? 0) == 0) {
+                                setor["inativo"] = true;
+                              }
+                            }
+
+                            break;
+                          }
+                        }
+
+                        await docRef.update({"setores": setores});
+                      }
                     }
 
                     Navigator.of(context).pop();
                   },
                   child: Text("Salvar"),
-                ),
-                TextButton(
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                  },
-                  child: Text("Cancelar"),
                 ),
               ],
             );
@@ -293,7 +504,6 @@ class _EquipPageState extends State<EquipPage> {
 
     final snapshot = await setoresRef.get();
 
-    // Pega maior número de "Setor n"
     final numbers =
         snapshot.docs.map((doc) {
           final nome = doc['nome'];
@@ -345,7 +555,8 @@ class _EquipPageState extends State<EquipPage> {
           final List<dynamic> setores = equipDoc['setores'] ?? [];
 
           for (var entry in setores) {
-            if (entry['ref'].path == setorRef.path) {
+            if (entry['ref'].path == setorRef.path &&
+                (userData?['Admin'] == true || entry['inativo'] != true)) {
               equipamentosDoSetor.add({
                 'nome': equipDoc['nome'],
                 'loc': entry['loc'],
@@ -436,8 +647,9 @@ class _EquipPageState extends State<EquipPage> {
                                       arguments: {'equipId': equip['id']},
                                     );
                                   },
-                                  onLongPress: () {
-                                    _shownewlogdialog(equip, context);
+                                  onLongPress: () async {
+                                    await _shownewlogdialog(equip, context);
+                                    await _loadSetoresComEquipamentos();
                                   },
                                 ),
                               )

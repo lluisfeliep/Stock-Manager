@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:numberpicker/numberpicker.dart';
 import 'package:provider/provider.dart';
 import 'package:stock_manager/user_provider.dart';
 
@@ -17,65 +18,125 @@ class _SearchPageState extends State<SearchPage> {
 
   List<Map<String, dynamic>> dados = [];
   List<Map<String, dynamic>> dadosFiltrados = [];
+  Map<String, dynamic>? userData;
   DocumentSnapshot? _lastDocument;
   bool _isLoading = false;
   bool _hasMore = true;
   final int _limit = 10;
 
-  void _shownewlogdialog(
+  Future<void> _shownewlogdialog(
     Map<String, dynamic> equipamento,
     BuildContext context,
   ) {
     final TextEditingController comentarioController = TextEditingController();
-    final userProvider = Provider.of<UserProvider>(context, listen: false);
+    int quantidade = 0;
 
-    showDialog(
+    return showDialog(
       context: context,
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setState) {
             return AlertDialog(
               title: Text("Novo uso"),
-              content: TextField(
-                controller: comentarioController,
-                decoration: InputDecoration(labelText: "Comentário"),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: comentarioController,
+                    decoration: InputDecoration(labelText: "Comentário"),
+                  ),
+                  Row(
+                    children: [
+                      Text("Quantidade usada:"),
+                      NumberPicker(
+                        minValue: 0,
+                        maxValue: equipamento['quantidade'],
+                        value: quantidade,
+                        onChanged: (value) {
+                          setState(() {
+                            quantidade = value;
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+                ],
               ),
               actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                  child: Text("Cancelar"),
+                ),
                 TextButton(
                   onPressed: () async {
                     String comentario = comentarioController.text.trim();
                     if (comentario.isNotEmpty) {
-                      final userId = userProvider.userData?["uid"];
+                      String userId = userData?["uid"];
                       final firestore = FirebaseFirestore.instance;
 
                       final loc = equipamento["loc"];
-                      final setorRef =
-                          equipamento["setorRef"]; // Isso deve ser um DocumentReference
+                      final setorRef = equipamento["setorRef"];
+
+                      final docRef = firestore
+                          .collection('equipamentos')
+                          .doc(equipamento["id"]);
 
                       final novaEntrada = {
-                        "comentario": comentario,
+                        "comentario":
+                            quantidade == 0
+                                ? comentario
+                                : "$comentario -$quantidade",
                         "data": DateTime.now(),
                         "loc": loc,
                         "setor": setorRef,
                         "user": firestore.doc('/Users/$userId'),
                       };
 
-                      await firestore
-                          .collection('equipamentos')
-                          .doc(equipamento["id"])
-                          .collection('log')
-                          .add(novaEntrada);
+                      // Adiciona o log
+                      await docRef.collection('log').add(novaEntrada);
+
+                      // Atualiza setores, se necessário
+                      final docSnapshot = await docRef.get();
+                      if (docSnapshot.exists) {
+                        final data = docSnapshot.data() as Map<String, dynamic>;
+                        List<dynamic> setores = data["setores"] ?? [];
+
+                        for (var setor in setores) {
+                          final ref = setor["ref"];
+                          if (ref is DocumentReference &&
+                              ref.path == setorRef.path &&
+                              setor.containsKey("quantidade")) {
+                            if (quantidade > 0) {
+                              setor["quantidade"] =
+                                  (setor["quantidade"] ?? 0) - quantidade;
+                              if (setor["quantidade"] < 0) {
+                                setor["quantidade"] = 0;
+                              }
+
+                              // Se zerou, marca como inativo
+                              if (setor["quantidade"] == 0) {
+                                setor["inativo"] = true;
+                              }
+                            } else {
+                              // Se quantidade usada é 0, mas no banco a quantidade já era 0
+                              if ((setor["quantidade"] ?? 0) == 0) {
+                                setor["inativo"] = true;
+                              }
+                            }
+
+                            break;
+                          }
+                        }
+
+                        await docRef.update({"setores": setores});
+                      }
                     }
 
                     Navigator.of(context).pop();
                   },
                   child: Text("Salvar"),
-                ),
-                TextButton(
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                  },
-                  child: Text("Cancelar"),
                 ),
               ],
             );
@@ -85,7 +146,7 @@ class _SearchPageState extends State<SearchPage> {
     );
   }
 
-  void _buscarEqui({bool append = false}) async {
+  Future<void> _buscarEqui({bool append = false}) async {
     if (_isLoading || !_hasMore) return;
     setState(() => _isLoading = true);
 
@@ -104,12 +165,21 @@ class _SearchPageState extends State<SearchPage> {
       List<Map<String, dynamic>> tempDados = [];
 
       for (var doc in snapshot.docs) {
-        final String nomeEquip = doc["nome"];
+        final data = doc.data() as Map<String, dynamic>;
+        final String nomeEquip = data["nome"];
         final String equipId = doc.id;
-        final List<dynamic> setores = doc["setores"] ?? [];
+        final List<dynamic> setores = data["setores"] ?? [];
 
         for (var entry in setores) {
           try {
+            // Verifica se o setor está inativo
+            final bool isInativo = entry["inativo"] == true;
+            final bool isAdmin = userData?['Admin'] == true;
+
+            // Se o setor for inativo e o usuário não for admin, ignora
+            if (isInativo && !isAdmin) continue;
+
+            // Pega a referência corretamente
             final refData = entry['ref'];
             DocumentReference setorRef;
 
@@ -124,7 +194,7 @@ class _SearchPageState extends State<SearchPage> {
             DocumentSnapshot setorSnap = await setorRef.get();
             String setorNome = setorSnap["nome"];
 
-            // A string de nome do setor e sala
+            // Pega o nome da sala a partir do path
             List<String> pathParts = setorRef.path.split('/');
             String salaId = pathParts[1];
             DocumentSnapshot salaSnap =
@@ -134,9 +204,8 @@ class _SearchPageState extends State<SearchPage> {
             tempDados.add({
               "id": equipId,
               "equip": nomeEquip,
-              "setor":
-                  "$salaNome / $setorNome", // Aqui você ainda está usando a string
-              "setorRef": setorRef, // Aqui você vai armazenar a referência
+              "setor": "$salaNome / $setorNome",
+              "setorRef": setorRef,
               "loc": entry["loc"] ?? "",
               "quantidade": entry["quantidade"] ?? 0,
             });
@@ -208,6 +277,12 @@ class _SearchPageState extends State<SearchPage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final provider = Provider.of<UserProvider>(context, listen: false);
+      setState(() {
+        userData = provider.userData;
+      });
+    });
     _buscarEqui();
     _scrollController.addListener(() {
       if (_scrollController.position.pixels >=
@@ -360,8 +435,13 @@ class _SearchPageState extends State<SearchPage> {
                           arguments: {"equipId": dadosFiltrados[index]["id"]},
                         );
                       },
-                      onLongPress: () {
-                        _shownewlogdialog(dadosFiltrados[index], context);
+                      onLongPress: () async {
+                        await _shownewlogdialog(dadosFiltrados[index], context);
+                        _lastDocument = null;
+                        _hasMore = true;
+                        dados.clear();
+                        dadosFiltrados.clear();
+                        await _buscarEqui();
                       },
                     );
                   } else {
