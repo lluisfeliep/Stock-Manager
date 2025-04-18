@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 
 class AdminPage extends StatefulWidget {
   const AdminPage({super.key});
@@ -130,7 +131,7 @@ class _AdminPageState extends State<AdminPage> {
     );
   }
 
-  void _showEditDialog(String userId, String username) async {
+  void updateUserEmail(String userId, String username) async {
     DocumentSnapshot userDoc =
         await _firestore.collection('Users').doc(userId).get();
 
@@ -194,20 +195,27 @@ class _AdminPageState extends State<AdminPage> {
                     }
 
                     try {
+                      // Atualiza Firestore
                       await _firestore.collection('Users').doc(userId).update({
                         "username": newUsername,
                         "Admin": isAdmin,
                         "PSala": isPSala,
                       });
 
+                      // Atualiza Firebase Auth (email)
+                      final functions = FirebaseFunctions.instance;
+                      await functions.httpsCallable('updateUserEmail').call({
+                        "uid": userId,
+                        "newEmail": "$newUsername@example.com",
+                      });
+
                       Navigator.pop(context);
-                      _buscarLogin(); // Atualiza a lista na tela
+                      _buscarLogin();
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: Text('Usuário atualizado com sucesso!'),
                         ),
                       );
-                      _buscarLogin();
                     } catch (e) {
                       ScaffoldMessenger.of(
                         context,
@@ -248,8 +256,14 @@ class _AdminPageState extends State<AdminPage> {
 
     if (confirmDelete) {
       try {
+        // Deleta do Firestore
         await _firestore.collection('Users').doc(userId).delete();
-        _buscarLogin(); // Atualiza a lista na tela
+
+        // Deleta do Firebase Auth
+        final functions = FirebaseFunctions.instance;
+        await functions.httpsCallable('deleteUser').call({"uid": userId});
+
+        _buscarLogin(); // Atualiza a lista
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Usuário excluído com sucesso!')),
         );
@@ -387,7 +401,7 @@ class _AdminPageState extends State<AdminPage> {
                             child: Center(
                               child: IconButton(
                                 onPressed: () {
-                                  _showEditDialog(
+                                  updateUserEmail(
                                     dados[index]["id"],
                                     dados[index]["username"],
                                   );
