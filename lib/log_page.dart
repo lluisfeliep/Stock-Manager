@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+import 'package:stock_manager/user_provider.dart';
 
 class LogPage extends StatefulWidget {
   const LogPage({super.key});
@@ -17,6 +19,7 @@ class _LogPageState extends State<LogPage> {
   List<Map<String, dynamic>> logs = [];
   String equipamentoNome = "";
   Map<String, dynamic> equipamentoData = {'quantidade': 0, 'setoresInfo': []};
+  Map<String, dynamic>? userData;
 
   @override
   void didChangeDependencies() {
@@ -26,8 +29,76 @@ class _LogPageState extends State<LogPage> {
     final args =
         ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>;
     equipId = args['equipId'];
-    _loadEquipamentoNome();
-    _loadLog();
+    if (userData == null) {
+      userData = Provider.of<UserProvider>(context).userData;
+      _loadEquipamentoNome();
+      _loadLog();
+    }
+  }
+
+  Future<void> showEditEquip() async {
+    final TextEditingController nomeController = TextEditingController(
+      text: equipamentoNome,
+    );
+    final userRef = FirebaseFirestore.instance
+        .collection('Users')
+        .doc(userData?["uid"]);
+    return showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: Text("Editar"),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: nomeController,
+                    decoration: InputDecoration(
+                      labelText: "Nome do equipamento",
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                  child: Text("Cancelar"),
+                ),
+                TextButton(
+                  onPressed: () async {
+                    String novoNome = nomeController.text.trim();
+                    if (novoNome != equipamentoNome) {
+                      final docRef = firestore
+                          .collection('equipamentos')
+                          .doc(equipId);
+                      final novaEntrada = {"nome": novoNome};
+                      await docRef.update(novaEntrada);
+
+                      await docRef.collection('log').add({
+                        'comentario':
+                            "Atualizado nome: \nAntigo:\n$equipamentoNome\nNovo:\n$novoNome",
+                        'data': DateTime.now(),
+                        'user': userRef,
+                        'setor': null,
+                        'loc': null,
+                      });
+                      _loadLog();
+                      _loadEquipamentoNome();
+                    }
+                    Navigator.of(context).pop();
+                  },
+                  child: Text("Salvar"),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   Future<void> _loadEquipamentoNome() async {
@@ -171,13 +242,16 @@ class _LogPageState extends State<LogPage> {
           horaFormatada = rawDate.split(' ')[1];
         }
 
+        String salaOuGeral = (sala.isEmpty && setor.isEmpty) ? "Geral" : sala;
+        String setorOuVazio = (sala.isEmpty && setor.isEmpty) ? "" : setor;
+
         tempLogs.add({
           'comentario': doc['comentario'] ?? '',
           'data': dataFormatada,
           'hora': horaFormatada,
           'user': username,
-          'setor': setor,
-          'sala': sala,
+          'setor': setorOuVazio,
+          'sala': salaOuGeral,
         });
       }
 
@@ -398,7 +472,9 @@ class _LogPageState extends State<LogPage> {
       floatingActionButton: FloatingActionButton(
         backgroundColor: Color(0xFF319FBD),
         child: Icon(Icons.edit),
-        onPressed: () {},
+        onPressed: () {
+          showEditEquip();
+        },
       ),
     );
   }
